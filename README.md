@@ -12,114 +12,13 @@ The canonical sources of truth are:
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) for GitHub workflow and research-decision handling;
 - [`AGENTS.md`](AGENTS.md) for coding-agent constraints.
 
-## Research Framing
+## Research Overview
 
-Schneider's GenXAI framework separates properties of an explanation from the sources, access requirements, and mechanisms used to obtain it.
+Following Schneider's GenXAI framing, this project studies one fixed local generative behavior through four complementary forms of evidence: model self-explanation, Integrated Gradients, controlled input intervention, and activation patching.
 
-Accordingly, this project does not treat self-explanation, feature attribution, behavioral perturbation, and mechanistic intervention as competing entries in a method leaderboard.
+The methods are applied to the same frozen experimental behavior so their evidence can be compared without treating them as equivalent explanations or ranking them. The focus is on what each method can support, where their evidence agrees or disagrees, and which assumptions limit the resulting claims.
 
-They answer different questions about the same model behavior.
-
-The experiment deliberately uses a **focused output scope** and a **single input-output relation**.
-It primarily investigates the model and prompt as foundational sources of explanation, while contrasting evidence obtainable from model outputs with evidence requiring gradients or internal activations.
-
-For a fixed input \(x\), the experiment defines one scalar target score \(F(x)\) that represents the generative behavior being studied.
-For the preferred next-token contrast,
-
-\[
-F(x) = z_{y^+}(x) - z_{y^-}(x),
-\]
-
-where \(z_{y^+}\) and \(z_{y^-}\) are the logits of the contrasted target tokens.
-
-The same \(F\) is then used throughout the experiment.
-This common target is what makes the different analyses comparable without pretending that they are the same kind of explanation.
-
-## Experiment
-
-```text
-controlled input contrast
-        ↓
-fixed model behavior and target score F
-        │
-        ├── model self-explanation
-        │       What does the model say mattered?
-        │
-        ├── Integrated Gradients
-        │       Which input dimensions are F sensitive to
-        │       along the defined attribution path?
-        │
-        ├── controlled input intervention
-        │       How much does F change under the predefined
-        │       finite input contrast?
-        │
-        └── activation patching
-                How does F change under a specified
-                intervention on an internal activation?
-        ↓
-compare agreement, disagreement, assumptions, and claim boundaries
-```
-
-Integrated Gradients is treated as a path-based attribution method rather than as a causal explanation.
-Its numerical implementation is checked using the expected completeness relation
-
-$$
-\sum_i IG_i \approx F(e) - F(e'),
-$$
-
-where \(e\) and \(e'\) are the input representation and the frozen baseline.
-
-The controlled input contrast measures a finite behavioral effect,
-
-$$
-\Delta F_{\mathrm{input}}
-=
-F(x^{\mathrm{contrast}})
--
-F(x^{\mathrm{clean}}),
-$$
-
-while activation patching asks a different causal question by intervening on a selected internal activation and measuring the resulting change in the same target score.
-
-The project therefore preserves several important distinctions:
-
-$$
-\text{plausibility} \neq \text{faithfulness},
-$$
-
-$$
-\text{attribution} \neq \text{causal mechanism},
-$$
-
-and
-
-$$
-\text{agreement between explanations} \neq \text{proof of a complete mechanism}.
-$$
-
-Exact method definitions, intervention semantics, frozen experimental choices, and interpretation limits belong to the [research protocol](docs/research/protocol.md).
-
-## Scope
-
-The core experiment is intentionally small: one small open-weight language model, one controlled-contrast design, one common target-score definition, and a small frozen set of calibration and research cases.
-
-No model training or fine-tuning is required.
-
-The project is not intended to be a general XAI benchmark, a catalogue of explanation methods, or a production GenAI system.
-Additional techniques are included only when they directly serve the research question.
-
-The complete scope and explicit non-scope are defined in [`docs/research/protocol.md`](docs/research/protocol.md).
-
-## Reproducibility
-
-Every numerical result, figure, and table used in the coursework report or presentation must come from an actual reproducible experiment run.
-
-The repository records the code, configuration, external model revisions, and small result artifacts needed to reproduce reported results without committing model weights or unnecessary large files.
-
-The exact reproducibility record and protocol-freeze requirements are defined in [`docs/research/protocol.md`](docs/research/protocol.md).
-
-Live work status, ownership, dependencies, research decisions, and milestone progress are tracked through GitHub rather than duplicated in repository documentation.
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+The core experiment is intentionally small: one small open-weight language model, one controlled-contrast design, and a small frozen set of calibration and research cases. It requires no model training, large-scale benchmarking, or production infrastructure.
 
 ## Development
 
@@ -143,25 +42,21 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the collaboration and verification 
 
 ## Repository Map
 
-- `docs/research/protocol.md` — canonical scientific protocol and mathematical definitions
+- `docs/research/protocol.md` — canonical research scope, mathematical definitions, methodology, evaluation, and claim boundaries
+- `docs/report/` — scientific report source and interpretation of results
 - `src/` — experiment implementation
-- `pyproject.toml` — Python project, dependencies, and Pixi configuration
-- `pixi.lock` — locked Python/software environment
-- `mise.toml` and `mise.lock` — development-tool versions
-- `CONTRIBUTING.md` — GitHub workflow and research-decision process
-- `AGENTS.md` — repository-wide instructions for coding agents
+- `pyproject.toml` and `pixi.lock` — Python dependencies and reproducible experiment environment
+- `mise.toml`, `mise.lock`, and `hk.pkl` — development tools and repository checks
+- `CONTRIBUTING.md` — collaboration workflow and research-decision handling
+- `AGENTS.md` — coding-agent instructions
+- GitHub Issues — current work contracts and consequential decisions or findings
+- GitHub Milestones — groups of work for research or coursework outcomes
+- Pull Requests — review of concrete repository changes and verification
 
-GitHub Issues track scoped work and research decisions that require independent tracking.
-GitHub Milestones group work around meaningful research or coursework outcomes.
+Accepted methods and reproducibility details belong in version-controlled documentation, source, configuration, or recorded experiment outputs rather than chronological Issue logs.
 
-## Coursework
+## Reproducibility and Coursework
 
-This repository is the reproducible source workspace for the coursework.
+All numerical results, figures, and tables used in the coursework must come from frozen, reproducible experiment runs. The repository records the code, configuration, exact external model and software revisions, and small result artifacts needed to reproduce reported results without committing model weights or unnecessary large files.
 
-The report and presentation must remain consistent with the frozen experiment and distinguish clearly between:
-
-- claims from Schneider (2024);
-- claims from later methodological literature;
-- observations produced by this project's experiments.
-
-Reported conclusions must reflect the observed results, including weak, negative, ambiguous, or inconsistent cases.
+The report and presentation must remain consistent with the frozen experiment, distinguish claims from Schneider (2024), later methodological literature, and this project's observations, and retain weak, negative, ambiguous, or inconsistent results when they occur.

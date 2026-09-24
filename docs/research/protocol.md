@@ -267,22 +267,72 @@ Any change that affects the scientific method must be reflected in this protocol
 
 #### 5.2 Freeze before final runs
 
-Before producing reported results, freeze:
+The frozen model and tokenizer are `Qwen/Qwen3-0.6B` at revision
+`c1899de289a04d12100db370d81485cdf75e47ca`.
+Use float32 weights and input embeddings, eager attention, evaluation mode,
+and no TF32 matrix multiplication.
+The repository lockfile records the selected software versions.
 
-- model and checkpoint revision;
-- tokenizer revision;
-- controlled prompt pairs;
-- designation of calibration and research cases;
-- target tokens and target score \(F\);
-- generation settings;
-- self-explanation prompt;
-- Integrated Gradients baseline, path method, numerical steps, and token aggregation;
-- controlled-factor token region;
-- input-intervention definition;
-- activation location, patch direction, and layer sweep;
-- software versions and relevant hardware settings.
+Each case has one fixed question with options A and B. Its clean input uses
+`Cue: {correct label}` and its contrast uses `Cue: {alternative label}`;
+the question, options, and all other prompt text are identical.
+The frozen cases are below; `\n` denotes a newline within a question:
 
-The final experiment manifest must enumerate every reported case.
+| Role | Question and options | Correct \(y^+\) | Alternative \(y^-\) |
+| --- | --- | --- | --- |
+| Calibration | `What is the capital of France?\nA) Paris\nB) Berlin` | A | B |
+| Research: arithmetic | `What is 7 + 5?\nA) 13\nB) 12` | B | A |
+| Research: logic | `All cats are mammals. Mira is a cat. Is Mira a mammal?\nA) Yes\nB) No` | A | B |
+
+Append `\nCue: {cue label}\nAnswer with only A or B.` to the question and
+options. Render this as one user message with Qwen3's chat template,
+`add_generation_prompt=True`, and `enable_thinking=False`. Read the A/B
+logits at the first answer-content position after the complete rendered
+prefix; do not generate reasoning tokens before scoring. Confirm that both
+labels are single tokens under the frozen tokenizer. For each case,
+\(F=z_{y^+}-z_{y^-}\), so a larger score always favors the correct label.
+The clean and contrast inputs must have equal token length and differ at only
+one tokenizer-aligned cue token. The controlled-factor region is that token.
+\(\Delta F_{\mathrm{input}}\) retains the definition in §4.3.
+
+After scoring the primary input, choose the higher-logit label from A and B
+and elicit self-explanation with a separate non-thinking user message:
+
+```text
+{question and options}
+Cue: {correct label}
+The selected answer label was {selected label}. In one sentence, explain why that label was selected.
+```
+
+Generate greedily with `do_sample=False`, `max_new_tokens=64`, and the
+tokenizer's EOS token as the padding token. This statement is prompted with
+the already fixed decision and is not independent evidence of the decision's
+cause.
+
+For IG, hold the chat-template structural token embeddings fixed. At every
+user-content position, use the embedding of the tokenizer's ordinary space
+token as the artificial space-token embedding baseline; retain the same
+length, attention mask, and positions. This is an artificial embedding
+reference, not a natural-language empty prompt. Attribution is relative to
+the straight embedding path from this reference to the clean input. Use
+Captum's `riemann_middle` rule and 1024 steps, as supported by the calibration
+convergence study. Sum embedding dimensions with their signs to obtain each
+token attribution. Always record the completeness delta as a numerical
+diagnostic. Fail on non-finite values or computation errors; do not apply a
+fixed pass/fail threshold to a finite residual. If a finite residual is large enough that the attribution sum does not reasonably approximate \(F(e)-F(e')\), report the attribution as numerically unreliable and do not interpret it as normal IG evidence.
+
+For activation patching, at each decoder layer,
+replace only the full residual-stream output vector at the aligned cue token
+in the contrast run with its clean-run value, then recompute \(F\). The
+calibration smoke test checks layer 0; the final experiment sweeps all layers.
+A weak effect at a late layer does not imply that the cue is irrelevant:
+information may have propagated to other positions. This sweep does not
+identify a complete circuit or information flow.
+
+The case list above is the final experiment manifest. Record exact installed
+software versions, commands, hardware, prompts, token IDs, and numerical
+outputs with reported results; do not treat the feasibility case as a final
+scientific result.
 
 #### 5.3 Final run sequence
 
