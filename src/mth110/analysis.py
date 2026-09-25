@@ -168,7 +168,7 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
         if case["contrast_score"] > 0
         else case["alternative_label"]
     )
-    for y, name, cue, choice, score in (
+    for y, name, cue, preference, score in (
         (
             0.62,
             "clean",
@@ -186,7 +186,9 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
     ):
         _diagram_box(model_axis, 0.13, y, f"x_{name}: {question}\nCue: {cue}")
         _diagram_box(model_axis, 0.34, y, "Qwen")
-        _diagram_box(model_axis, 0.55, y, f"logits A/B\nchọn {choice}")
+        _diagram_box(
+            model_axis, 0.55, y, f"vector logits\nz_A, z_B → nghiêng {preference}"
+        )
         _diagram_box(model_axis, 0.78, y, f"F({name}) = {score:.3f}", "#e8f2ec")
         for left, right in ((0.23, 0.29), (0.39, 0.46), (0.63, 0.70)):
             _diagram_arrow(model_axis, (left, y), (right, y))
@@ -302,7 +304,7 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     title_axis.text(
         0.01,
         0.95,
-        "SỐ HỌC: LỰA CHỌN ĐO ĐƯỢC ≠ LỜI TỰ GIẢI THÍCH",
+        "SỐ HỌC: ƯU THẾ A/B TỪ LOGITS ≠ LỜI TỰ GIẢI THÍCH",
         fontsize=20,
         weight="bold",
         color="#a43432",
@@ -329,7 +331,7 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     self_axis.text(
         0.02,
         0.95,
-        "TỰ GIẢI THÍCH  ·  Lượt hỏi riêng sau khi đo lựa chọn",
+        "TỰ GIẢI THÍCH  ·  Lượt hỏi riêng sau khi suy ra ưu thế A/B",
         weight="bold",
         va="top",
         fontsize=15,
@@ -339,7 +341,7 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
         0.17,
         0.52,
         f"Prompt riêng: câu hỏi + Cue: {case['correct_label']}\n"
-        f"+ nhãn đã chọn {case['selected_label']}",
+        f"+ nhãn {case['selected_label']} suy ra từ logits",
     )
     _diagram_box(self_axis, 0.40, 0.52, "Qwen")
     _diagram_arrow(self_axis, (0.32, 0.52), (0.35, 0.52))
@@ -351,8 +353,8 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
         0.51,
         0.08,
         f"BẤT ĐỒNG: phát biểu {case['correct_label']} ≠ "
-        f"lựa chọn đo được {case['selected_label']}.\n"
-        "Không thể coi đây là giải thích trung thực cho lựa chọn đã đo.",
+        f"ưu thế suy ra {case['selected_label']}.\n"
+        "Không thể coi đây là giải thích trung thực cho ưu thế A/B đã đo.",
         color="#b33d39",
         weight="bold",
         fontsize=13,
@@ -381,7 +383,7 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     )
     patch_axis.set(xlabel="Tầng decoder", ylabel="ΔF_patch")
     patch_axis.set_title(
-        "PATCH  ·  Kích hoạt cue clean/contrast + F → ΔF theo tầng",
+        "PATCH  ·  Prompt đôi + kích hoạt cue + F → ΔF theo tầng",
         loc="left",
         fontsize=14,
         weight="bold",
