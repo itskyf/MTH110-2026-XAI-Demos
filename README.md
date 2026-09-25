@@ -48,6 +48,18 @@ The command writes the case-level evidence and run metadata to `data/frozen.json
 After PR review and merge, the finalized JSON is published as an immutable GitHub
 Release asset; reruns use a new tag and release.
 
+To regenerate the Issue #3 evidence outputs from that release:
+
+```shell
+bash scripts/fetch_frozen.sh
+pixi run --locked python -m mth110.analysis
+```
+
+The download command is needed only when `data/frozen.json` is absent. The
+analysis checks the recorded numerical diagnostics, writes the local ignored
+`data/evidence-summary.csv`, and regenerates figures under
+`docs/report/figures/`.
+
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the collaboration and verification workflow.
 
 ## Repository Map

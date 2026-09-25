@@ -833,6 +833,7 @@ packages:
   name: mth110
   requires_dist:
   - captum>=0.9.0,<0.10
+  - matplotlib>=3.11,<4
   - nnsight>=0.7.0,<0.8
   - transformers[torch]>=5.17.0,<6
   requires_python: '>=3.13'

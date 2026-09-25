@@ -2,7 +2,7 @@
 name = "mth110"
 requires-python = ">= 3.13"
 authors = [{ name = "Kỳ", email = "40734986+itskyf@users.noreply.github.com" }]
-dependencies = ["captum>=0.9.0,<0.10", "nnsight>=0.7.0,<0.8", "transformers[torch]>=5.17.0,<6"]
+dependencies = ["captum>=0.9.0,<0.10", "matplotlib>=3.11,<4", "nnsight>=0.7.0,<0.8", "transformers[torch]>=5.17.0,<6"]
 dynamic = ["version"]
 
 [dependency-groups]
