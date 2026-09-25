@@ -520,4 +520,4 @@ The report and presentation must distinguish:
 4. Meng, K., Bau, D., Andonian, A., & Belinkov, Y. (2022). *Locating and Editing Factual Associations in GPT*. Advances in Neural Information Processing Systems 35.
 5. Heimersheim, S., & Nanda, N. (2024). *How to use and interpret activation patching*. arXiv:2404.15255.
 6. Geiger, A., Ibeling, D., Zur, A., et al. (2025). *Causal Abstraction: A Theoretical Foundation for Mechanistic Interpretability*. Journal of Machine Learning Research, 26(83), 1–64.
-7. Turpin, M., Michael, J., Perez, E., & Bowman, S. R. (2024). *Language Models Don't Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting*. Advances in Neural Information Processing Systems.
+7. Turpin, M., Michael, J., Perez, E., & Bowman, S. R. (2023). *Language Models Don't Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting*. Advances in Neural Information Processing Systems 36 (NeurIPS 2023). Schneider (2024) cites this work as Turpin et al. (2024).
