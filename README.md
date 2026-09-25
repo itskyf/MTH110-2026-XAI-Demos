@@ -48,6 +48,17 @@ The command writes the case-level evidence and run metadata to `data/frozen.json
 After PR review and merge, the finalized JSON is published as an immutable GitHub
 Release asset; reruns use a new tag and release.
 
+To regenerate the [Issue #3 evidence](docs/research/evidence.md) from that release:
+
+```shell
+bash scripts/fetch_frozen.sh
+pixi run --locked python scripts/analyze_frozen.py
+```
+
+The download command is needed only when `data/frozen.json` is absent. The
+analysis verifies the release asset digest before writing report-ready outputs
+under `docs/report/`.
+
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the collaboration and verification workflow.
 
 ## Repository Map
