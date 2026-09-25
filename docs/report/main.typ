@@ -23,9 +23,43 @@
 
 = Câu hỏi và khung GenXAI
 
-Schneider (2024) đề xuất phân biệt *phạm vi của lời giải thích* với nguồn và điều kiện cần để tạo ra nó. Trong thí nghiệm này, đối tượng được giải thích là chênh lệch logit giữa hai nhãn ở đúng vị trí token trả lời đầu tiên, cho một cặp lời nhắc cố định. Đây là phạm vi đầu ra tập trung và một quan hệ đầu vào–đầu ra đơn lẻ, không phải toàn bộ câu trả lời hay toàn bộ cuộc hội thoại. Lời nhắc và mô hình là hai nguồn nền tảng; dữ liệu huấn luyện và quá trình tối ưu không được khảo sát. Cách đặt câu hỏi hẹp giúp các dạng bằng chứng cùng quy về một đại lượng đo được, trong khi vẫn giữ khác biệt giữa những gì chúng quan sát. Khung phân loại và các desiderata như tính trung thực, tính hợp lý bề ngoài, tính đầy đủ, độ nhạy và độ vững đến từ Schneider; quy trình so sánh bốn dạng bằng chứng là thiết kế của dự án này.
+Schneider (2024) phân biệt *đầu ra của thuật toán GenXAI* (lời giải thích) với thông tin đầu vào và nội bộ mà phương pháp XAI cần để tạo ra lời giải thích ấy. Ông cũng phân biệt phạm vi của lời giải thích theo phần đầu ra và quan hệ đầu vào–đầu ra của *hệ AI gốc* được giải thích. Các chiều phạm vi này nói về *cái gì của hệ AI gốc được giải thích*, không phải cổng vào/ra của thuật toán XAI. Ở đây, đầu vào gốc là lời nhắc, còn đầu ra gốc tại vị trí trả lời đầu tiên là logits của mô hình; so sánh logits A/B cho nhãn được đo. Hành vi đầu ra tập trung cần giải thích là ưu thế tương đối giữa hai token trả lời A/B tại vị trí đó, trong một quan hệ đầu vào–đầu ra đơn lẻ. Điểm $F$ bên dưới *lượng hóa* hành vi ấy cho nghiên cứu; bản thân $F$ không phải câu trả lời tự nhiên của mô hình và cũng không phải lời giải thích. Lời nhắc và mô hình là hai nguồn nền tảng; dữ liệu huấn luyện và quá trình tối ưu không được khảo sát. Khung phân loại và các desiderata như tính trung thực, tính hợp lý bề ngoài, tính đầy đủ, độ nhạy và độ vững đến từ Schneider; quy trình so sánh bốn dạng bằng chứng là thiết kế của dự án này.
 
-Lời tự giải thích do chính mô hình sinh ra sau khi quyết định đã được cố định, nên chỉ cần truy cập đầu ra kiểu hộp đen. Phép đổi tín hiệu gợi ý quan sát tác động hành vi; nhãn chọn có thể thấy bằng hộp đen, còn chênh lệch logit $F$ cụ thể cần truy cập điểm số kiểu hộp xám. IG cần gradient và embedding; thay thế kích hoạt cần trạng thái nội bộ, nên hai phép này đòi hỏi truy cập hộp trắng. Theo Schneider, phân biệt *mô hình tự giải thích* với *thuật toán giải thích* cũng quan trọng: văn bản do mô hình phát biểu không phải phép đo trực tiếp của tính toán nội bộ. Việc đặt cả bốn dạng cạnh nhau nhằm đối chiếu phạm vi bằng chứng, không xếp hạng các phương pháp.
+Lời tự giải thích do chính mô hình sinh ra sau khi quyết định đã được cố định, nên chỉ cần truy cập đầu ra kiểu hộp đen. Phép đổi tín hiệu gợi ý quan sát tác động hành vi; nhãn chọn có thể thấy bằng hộp đen, còn chênh lệch logit $F$ cụ thể cần truy cập điểm số kiểu hộp xám. IG cần gradient và embedding; thay thế kích hoạt cần trạng thái nội bộ, nên hai phép này đòi hỏi truy cập hộp trắng. Theo Schneider, phân biệt *mô hình tự giải thích* với *thuật toán giải thích* cũng quan trọng: văn bản do mô hình phát biểu không phải phép đo trực tiếp của tính toán nội bộ. Bảng sau tách đầu vào và kết quả của từng bước; một số kết quả là hiện vật giải thích, số khác là đại lượng can thiệp. Việc đặt chúng cạnh nhau nhằm đối chiếu phạm vi bằng chứng, không xếp hạng các phương pháp.
+
+#text(size: 8.5pt)[
+  #table(
+    columns: (2.2cm, 4.5cm, 4.1cm, 1fr),
+    inset: 4pt,
+    table.header(
+      [*Hệ / phép*], [*Đầu vào*], [*Đầu ra*], [*Câu hỏi được trả lời*]
+    ),
+    [Mô hình gốc],
+    [Lời nhắc câu hỏi, đáp án A/B và cue],
+    [Logits tại token trả lời; nhãn A/B suy ra từ hai logits],
+    [Mô hình ưu tiên nhãn nào?],
+
+    [Tự giải thích],
+    [Lời nhắc riêng, có nhãn đã chọn],
+    [Văn bản mô hình phát biểu],
+    [Mô hình nói vì sao đã chọn nhãn?],
+
+    [IG],
+    [Embedding clean, tham chiếu dấu cách, gradient của $F$],
+    [Attribution có dấu theo token],
+    [Đường embedding quy phần chênh $F$ cho token nào?],
+
+    [Đổi đầu vào],
+    [Hai lời nhắc chỉ khác cue; điểm $F$ của hai lượt],
+    [$Delta F_"input"$],
+    [Đổi cue làm điểm thay đổi bao nhiêu?],
+
+    [Patch kích hoạt],
+    [Kích hoạt cue clean/contrast và điểm $F$],
+    [Hiệu ứng patch theo tầng],
+    [Thay vector cue clean ảnh hưởng điểm contrast thế nào?],
+  )
+]
 
 = Thiết kế và ý nghĩa toán học
 
@@ -33,7 +67,7 @@ Thí nghiệm dùng checkpoint Qwen/Qwen3-0.6B tại revision `c1899de289a04d121
 
 $ F(x) = z_(y^+)(x) - z_(y^-)(x), $
 
-trong đó $z_y$ là logit trước softmax tại vị trí trả lời cố định. Dấu dương của $F$ nghĩa là nhãn đúng có logit cao hơn nhãn kia; nó không nói nhãn đó có xác suất lớn hơn mọi token khác trong từ vựng. Cặp *clean/contrast* chỉ khác ở một token gợi ý `Cue: B` hoặc `Cue: A`; "clean" là tên vận hành, không ngụ ý đầu vào không có thiên lệch. Ba trường hợp đóng băng gồm hiệu chuẩn (thủ đô Pháp), số học ($7+5$), và logic (Mira là mèo; mọi mèo đều là động vật có vú). Số học và logic là hai trường hợp nghiên cứu; hiệu chuẩn chỉ kiểm tra rằng quy trình cho tín hiệu có thể quan sát.
+trong đó $z_y$ là logit trước softmax tại vị trí trả lời cố định. $F$ được tính từ đầu ra logits để lượng hóa ưu thế A/B, rồi dùng làm cùng một điểm đích cho các phép phân tích; nó không phải đầu ra văn bản hay hiện vật giải thích. Dấu dương của $F$ nghĩa là nhãn đúng có logit cao hơn nhãn kia; nó không nói nhãn đó có xác suất lớn hơn mọi token khác trong từ vựng. Cặp *clean/contrast* chỉ khác ở một token gợi ý `Cue: B` hoặc `Cue: A`; "clean" là tên vận hành, không ngụ ý đầu vào không có thiên lệch. Ba trường hợp đóng băng gồm hiệu chuẩn (thủ đô Pháp), số học ($7+5$), và logic (Mira là mèo; mọi mèo đều là động vật có vú). Số học và logic là hai trường hợp nghiên cứu; hiệu chuẩn chỉ kiểm tra rằng quy trình cho tín hiệu có thể quan sát.
 
 == Lời tự giải thích và can thiệp đầu vào
 
@@ -78,7 +112,7 @@ với $k$ là vị trí cue đã căn chỉnh. Dấu dương nghĩa là can thi�
 #page(flipped: true)[
   #figure(
     image("figures/arithmetic-case-comparison.svg", width: 100%),
-    caption: [Đối chiếu trường hợp số học từ `v1.0.0/frozen.json`. Văn bản là lời tự giải thích được ghi lại sau lựa chọn A/B; các số là logit-difference và hiệu ứng theo đúng quy ước của giao thức. IG có dấu trên đầu vào clean theo tham chiếu embedding dấu cách; đường patch biểu diễn thay vector cue clean vào lượt contrast tại từng tầng. Các hàng có phạm vi chứng cứ khác nhau, không hợp thành điểm trung thực.],
+    caption: [Đối chiếu trường hợp số học từ `v1.0.0/frozen.json`: hai lượt của mô hình gốc cho logits, lựa chọn đo được và điểm $F$ suy ra; các lượt giải thích/can thiệp dùng thông tin khác nhau và cho các dạng bằng chứng khác nhau. IG có dấu trên đầu vào clean theo tham chiếu embedding dấu cách; patch thay vector cue clean vào lượt contrast tại từng tầng. Các kết quả không hợp thành điểm trung thực.],
   ) <comparison>
 ]
 

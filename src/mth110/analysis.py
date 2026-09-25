@@ -10,7 +10,8 @@ import matplotlib as mpl
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
-from transformers import AutoTokenizer
+from matplotlib.axes import Axes
+from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 SOURCE = Path("data/frozen.json")
 SUMMARY = Path("data/evidence-summary.csv")
@@ -119,6 +120,173 @@ def write_summary(data: dict) -> None:
             )
 
 
+def _diagram_box(
+    axis: Axes, x: float, y: float, label: str, color: str = "#edf3f8"
+) -> None:
+    axis.text(
+        x,
+        y,
+        label,
+        ha="center",
+        va="center",
+        transform=axis.transAxes,
+        bbox={
+            "boxstyle": "round,pad=0.45",
+            "facecolor": color,
+            "edgecolor": "#496678",
+        },
+    )
+
+
+def _diagram_arrow(
+    axis: Axes, start: tuple[float, float], end: tuple[float, float]
+) -> None:
+    axis.annotate(
+        "",
+        xy=end,
+        xytext=start,
+        xycoords="axes fraction",
+        arrowprops={"arrowstyle": "->", "color": "#496678", "linewidth": 1.5},
+    )
+
+
+def _draw_model_runs(model_axis: Axes, case: dict) -> None:
+    model_axis.axis("off")
+    model_axis.text(
+        0.02,
+        0.88,
+        "1. Đầu vào/đầu ra của mô hình gốc và điểm nghiên cứu suy ra",
+        weight="bold",
+        va="top",
+    )
+    question = case["question"].splitlines()[0]
+    contrast_label = (
+        case["correct_label"]
+        if case["contrast_score"] > 0
+        else case["alternative_label"]
+    )
+    for y, name, cue, choice, score in (
+        (
+            0.70,
+            "clean",
+            case["correct_label"],
+            case["selected_label"],
+            case["clean_score"],
+        ),
+        (
+            0.25,
+            "contrast",
+            case["alternative_label"],
+            contrast_label,
+            case["contrast_score"],
+        ),
+    ):
+        _diagram_box(model_axis, 0.14, y, f"x_{name}: {question}\nCue: {cue}")
+        _diagram_box(model_axis, 0.36, y, "Mô hình gốc")
+        _diagram_box(model_axis, 0.58, y, f"logits A/B; chọn {choice}")
+        _diagram_box(model_axis, 0.78, y, f"F({name}) = {score:.3f}", "#e8f2ec")
+        for left, right in ((0.24, 0.29), (0.43, 0.49), (0.68, 0.71)):
+            _diagram_arrow(model_axis, (left, y), (right, y))
+    _diagram_arrow(model_axis, (0.94, 0.65), (0.94, 0.33))
+    model_axis.text(0.95, 0.49, f"ΔF_input\n= {case['input_delta']:.3f}", va="center")
+
+
+def render_arithmetic_comparison(
+    data: dict, tokenizer: PreTrainedTokenizerBase
+) -> None:
+    """Draw the frozen arithmetic evidence and its distinct procedure inputs."""
+    case = next(case for case in data["cases"] if case["case"] == "arithmetic")
+    plt.rcParams["font.family"] = "Liberation Sans"
+    fig, axes = plt.subplots(
+        6,
+        1,
+        figsize=(16, 9.5),
+        layout="constrained",
+        gridspec_kw={"height_ratios": (2.2, 1.15, 0.52, 2.1, 0.52, 1.6)},
+    )
+
+    _draw_model_runs(axes[0], case)
+
+    explanation = " ".join(case["self_explanation"].replace("**", "").split())
+    check(
+        f"{case['correct_label']})" in explanation,
+        "arithmetic: explanation label differs",
+    )
+    self_axis = axes[1]
+    self_axis.axis("off")
+    self_axis.text(
+        0.02,
+        0.95,
+        "2. Tự giải thích: một lượt hỏi riêng sau lựa chọn A/B",
+        weight="bold",
+        va="top",
+    )
+    _diagram_box(
+        self_axis,
+        0.19,
+        0.50,
+        f"Prompt riêng: câu hỏi + Cue: {case['correct_label']}\n"
+        f"+ nhãn đã chọn {case['selected_label']}",
+    )
+    _diagram_box(self_axis, 0.42, 0.50, "Mô hình gốc")
+    _diagram_arrow(self_axis, (0.33, 0.50), (0.36, 0.50))
+    _diagram_arrow(self_axis, (0.48, 0.50), (0.52, 0.50))
+    self_axis.text(
+        0.53, 0.67, textwrap.fill(explanation, width=82), va="center", fontsize=11
+    )
+    self_axis.text(
+        0.53,
+        0.13,
+        f"Bất đồng: lời giải thích nói {case['correct_label']}; "
+        f"lựa chọn đã đo là {case['selected_label']}.",
+        color="#b33d39",
+        weight="bold",
+    )
+
+    ig_header = axes[2]
+    ig_header.axis("off")
+    _diagram_box(ig_header, 0.25, 0.45, "Embedding clean + tham chiếu dấu cách + F")
+    _diagram_arrow(ig_header, (0.45, 0.45), (0.53, 0.45))
+    _diagram_box(ig_header, 0.74, 0.45, "3. IG có dấu theo token", "#e8f2ec")
+
+    values = case["token_attribution"]
+    positions = range(len(values))
+    ig_axis = axes[3]
+    ig_axis.bar(
+        positions,
+        values,
+        color=["#c0504d" if value < 0 else "#3978a8" for value in values],
+    )
+    ig_axis.axhline(0, color="black", linewidth=0.5)
+    ig_axis.axvline(
+        case["cue_position"],
+        color="#277b45",
+        linewidth=1.7,
+        label=f"cue (IG = {values[case['cue_position']]:.3f})",
+    )
+    ig_axis.set_ylabel("IG có dấu")
+    ig_axis.set_xticks(
+        list(positions),
+        tokenizer.convert_ids_to_tokens(case["clean_token_ids"]),
+        rotation=90,
+        fontsize=10,
+    )
+    ig_axis.legend(loc="upper right")
+
+    patch_header = axes[4]
+    patch_header.axis("off")
+    _diagram_box(patch_header, 0.25, 0.45, "Kích hoạt cue clean/contrast + F")
+    _diagram_arrow(patch_header, (0.45, 0.45), (0.53, 0.45))
+    _diagram_box(patch_header, 0.74, 0.45, "4. Hiệu ứng patch theo tầng", "#e8f2ec")
+
+    patch_axis = axes[5]
+    patch_axis.plot(range(len(case["patch_deltas"])), case["patch_deltas"], marker=".")
+    patch_axis.axhline(0, color="black", linewidth=0.5)
+    patch_axis.set(xlabel="Tầng decoder", ylabel="ΔF_patch")
+    fig.savefig(FIGURES / "arithmetic-case-comparison.svg", metadata={"Date": None})
+    plt.close(fig)
+
+
 def render(data: dict) -> None:
     """Plot signed token attribution and layer-wise patch effects."""
     tokenizer = AutoTokenizer.from_pretrained(
@@ -179,75 +347,7 @@ def render(data: dict) -> None:
     )
     plt.close(fig)
 
-    case = next(case for case in data["cases"] if case["case"] == "arithmetic")
-    fig, axes = plt.subplots(
-        4,
-        1,
-        figsize=(16, 10),
-        layout="constrained",
-        gridspec_kw={"height_ratios": (1.2, 0.7, 3, 2)},
-    )
-    explanation = " ".join(case["self_explanation"].replace("**", "").split())
-    axes[0].axis("off")
-    axes[0].text(
-        0,
-        0.8,
-        "Recorded self-explanation (elicited after the A/B choice)",
-        weight="bold",
-        transform=axes[0].transAxes,
-    )
-    axes[0].text(
-        0,
-        0.5,
-        textwrap.fill(explanation, width=110),
-        va="center",
-        transform=axes[0].transAxes,
-    )
-    axes[1].axis("off")
-    axes[1].text(
-        0,
-        0.8,
-        f"Measured choice: {case['selected_label']}  |  "
-        f"F(clean) = {case['clean_score']:.3f}  |  "
-        f"F(contrast) = {case['contrast_score']:.3f}  |  "
-        f"ΔF_input = {case['input_delta']:.3f}",
-        weight="bold",
-        transform=axes[1].transAxes,
-    )
-    values = case["token_attribution"]
-    positions = range(len(values))
-    axes[2].bar(
-        positions,
-        values,
-        color=["#c0504d" if value < 0 else "#3978a8" for value in values],
-    )
-    axes[2].axhline(0, color="black", linewidth=0.5)
-    axes[2].axvline(
-        case["cue_position"],
-        color="#277b45",
-        linewidth=1.7,
-        label=f"Frozen cue (IG = {values[case['cue_position']]:.3f})",
-    )
-    axes[2].set(
-        title="Signed token-level Integrated Gradients (clean input)",
-        ylabel="Signed IG",
-    )
-    axes[2].set_xticks(
-        list(positions),
-        tokenizer.convert_ids_to_tokens(case["clean_token_ids"]),
-        rotation=90,
-        fontsize=11,
-    )
-    axes[2].legend(loc="upper right")
-    axes[3].plot(range(len(case["patch_deltas"])), case["patch_deltas"], marker=".")
-    axes[3].axhline(0, color="black", linewidth=0.5)
-    axes[3].set(
-        title="Clean-to-contrast cue activation patching",
-        xlabel="Decoder layer",
-        ylabel="Effect on F",
-    )
-    fig.savefig(FIGURES / "arithmetic-case-comparison.svg", metadata={"Date": None})
-    plt.close(fig)
+    render_arithmetic_comparison(data, tokenizer)
     for path in FIGURES.glob("*.svg"):
         path.write_text(
             "\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n"
