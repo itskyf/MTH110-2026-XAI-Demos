@@ -52,7 +52,7 @@ To regenerate the [Issue #3 evidence](docs/research/evidence.md) from that relea
 
 ```shell
 bash scripts/fetch_frozen.sh
-pixi run --locked python scripts/analyze_frozen.py
+pixi run --locked python -m mth110.analysis
 ```
 
 The download command is needed only when `data/frozen.json` is absent. The

@@ -65,7 +65,7 @@ From the repository root, with the configured environment installed:
 
 ```shell
 bash scripts/fetch_frozen.sh  # only if data/frozen.json is absent
-pixi run --locked python scripts/analyze_frozen.py
+pixi run --locked python -m mth110.analysis
 typst compile docs/report/evidence.typ
 ```
 
