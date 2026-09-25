@@ -154,8 +154,8 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
     model_axis.axis("off")
     model_axis.text(
         0.02,
-        0.96,
-        "MÔ HÌNH GỐC  ·  Hành vi được đo: ưu thế A/B ở token trả lời đầu tiên",
+        0.99,
+        "MÔ HÌNH GỐC  ·  Ưu thế A/B ở token trả lời đầu tiên",
         weight="bold",
         va="top",
         fontsize=15,
@@ -168,14 +168,14 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
     )
     for y, name, cue, choice, score in (
         (
-            0.68,
+            0.62,
             "clean",
             case["correct_label"],
             case["selected_label"],
             case["clean_score"],
         ),
         (
-            0.32,
+            0.27,
             "contrast",
             case["alternative_label"],
             contrast_label,
@@ -188,10 +188,10 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
         _diagram_box(model_axis, 0.78, y, f"F({name}) = {score:.3f}", "#e8f2ec")
         for left, right in ((0.23, 0.29), (0.39, 0.46), (0.63, 0.70)):
             _diagram_arrow(model_axis, (left, y), (right, y))
-    _diagram_arrow(model_axis, (0.91, 0.64), (0.91, 0.36))
+    _diagram_arrow(model_axis, (0.91, 0.58), (0.91, 0.31))
     model_axis.text(
         0.92,
-        0.50,
+        0.45,
         f"ΔF_input\n{case['input_delta']:.3f}",
         va="center",
         fontsize=13,

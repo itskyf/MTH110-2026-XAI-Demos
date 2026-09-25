@@ -123,7 +123,7 @@ với $k$ là vị trí cue đã căn chỉnh. Dấu dương nghĩa là can thi�
 #page(flipped: true)[
   #figure(
     image("figures/arithmetic-case-comparison.svg", width: 100%),
-    caption: [Bản đồ bằng chứng số học từ `v1.0.0/frozen.json`. Hai lời nhắc cue cho lựa chọn A/B đã đo và điểm $F$ suy ra; lượt tự giải thích nhận thêm nhãn đã chọn nhưng phát biểu B trái với lựa chọn A. Đổi cue cho $Delta F_"input"$; embedding clean, baseline và $F$ cho IG có dấu; kích hoạt cue clean/contrast và $F$ cho hiệu ứng patch theo tầng. Can thiệp hỗ trợ vai trò của cue trong đúng các phép đo này; IG không xác lập cơ chế nhân quả, patch không chứng minh tính cần thiết hay toàn bộ cơ chế, và phát biểu B không giải thích trung thực lựa chọn A đã đo.],
+    caption: [Bằng chứng số học từ `v1.0.0/frozen.json`: hai lượt mô hình chọn A và cho $F$; lượt tự giải thích riêng phát biểu B. Đổi cue cho $Delta F_"input"$, IG cho attribution có dấu, patch cho hiệu ứng theo tầng. Cue có tác động trong các phép can thiệp này, nhưng kết quả không xác lập cơ chế đầy đủ hay giải thích trung thực cho lựa chọn A.],
   ) <comparison>
 ]
 
