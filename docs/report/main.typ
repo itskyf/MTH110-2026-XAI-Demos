@@ -23,11 +23,15 @@
 
 #block(fill: luma(245), inset: 8pt, width: 100%)[
   #text(font: "Noto Sans", size: 8.8pt)[
-    *MÔ HÌNH GỐC*　 lời nhắc → Qwen → logits ở token trả lời đầu → nhãn A/B được đo
+    *HỆ GỐC*　 Qwen3-0.6B + lời nhắc/cấu hình đóng băng → logits và nhãn A/B được đo
 
-    *ĐẠI LƯỢNG NGHIÊN CỨU*　 hai logit → $F = z_(y^+) - z_(y^-)$, ưu thế tương đối A/B
+    ↓ *HÀNH VI ĐÍCH*　 ưu thế A/B ở token trả lời đầu, $F = z_(y^+) - z_(y^-)$ suy ra từ logits
 
-    *BẰNG CHỨNG VỀ HÀNH VI ẤY*　 tự giải thích → phát biểu; đổi cue → $Delta F_"input"$; IG → attribution có dấu; patch kích hoạt → $Delta F^"patch"$ theo tầng.
+    ↓ *BẰNG CHỨNG ĐẦU VÀO*　 đổi cue → $Delta F_"input"$; IG → attribution có dấu theo token
+
+    ↓ *BẰNG CHỨNG NỘI BỘ*　 patch kích hoạt cue → $Delta F^"patch"$ theo tầng
+
+    *PHÁT BIỂU ĐỐI CHIẾU*　 lời tự giải thích do mô hình sinh → so với lựa chọn đã đo; không phải phép đo nhân quả tương đương.
   ]
 ]
 
@@ -83,7 +87,7 @@ Lời tự giải thích từ lượt hỏi riêng lại nói "The correct answe
 #page(flipped: true)[
   #figure(
     image("figures/arithmetic-case-comparison.svg", width: 100%),
-    caption: [Bằng chứng số học từ `v1.0.0/frozen.json`: hai lượt mô hình chọn A và cho $F$; lượt tự giải thích riêng phát biểu B. Đổi cue cho $Delta F_"input"$, IG cho attribution có dấu, patch cho hiệu ứng theo tầng. Cue có tác động trong các phép can thiệp này, nhưng kết quả không xác lập cơ chế đầy đủ hay giải thích trung thực cho lựa chọn A.],
+    caption: [Bằng chứng số học từ `v1.0.0/frozen.json`: hai lượt mô hình chọn A, còn lời tự giải thích riêng phát biểu B. Đổi cue cho $Delta F_"input"$, IG cho attribution có dấu, patch cho hiệu ứng theo tầng; đường đứt là mức phục hồi clean tham chiếu, không phải ngưỡng. Các kết quả không xác lập cơ chế đầy đủ hay giải thích trung thực cho lựa chọn A.],
   ) <comparison>
 ]
 

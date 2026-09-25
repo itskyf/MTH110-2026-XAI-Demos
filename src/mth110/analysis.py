@@ -273,6 +273,22 @@ def _draw_signed_prompt(
         )
 
 
+def _draw_ig_scale(axis: Axes, scale: float, bounds: tuple[float, ...]) -> None:
+    """Show the same zero-centered colors used behind the prompt tokens."""
+    colors = plt.get_cmap("RdBu")
+    palette = [
+        tuple(0.53 + 0.47 * channel for channel in colors(index / 255)[:3])
+        for index in range(256)
+    ]
+    bar = axis.inset_axes(bounds)
+    bar.imshow([palette], aspect="auto", extent=(-scale, scale, 0, 1))
+    bar.set_yticks([])
+    bar.set_xticks((-scale, 0, scale), (f"-{scale:.3f}", "0", f"+{scale:.3f}"))
+    bar.tick_params(axis="x", labelsize=9, length=2, pad=1)
+    for spine in bar.spines.values():
+        spine.set_visible(False)
+
+
 def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     """Map the frozen arithmetic behavior to distinct evidence and limits."""
     case = next(case for case in data["cases"] if case["case"] == "arithmetic")
@@ -295,7 +311,9 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     title_axis.text(
         0.01,
         0.05,
-        "Cue tác động lên F ở ba phép đo khác nhau; không xác lập cơ chế đầy đủ.",
+        f"Ca này: y+ = {case['correct_label']} (đúng), "
+        f"y- = {case['alternative_label']} (còn lại); "
+        rf"$F=z_{{y^+}}-z_{{y^-}}=z_{{{case['correct_label']}}}-z_{{{case['alternative_label']}}}$",
         fontsize=13,
         va="bottom",
     )
@@ -345,6 +363,22 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     note_axes = [fig.add_subplot(grid[4, column]) for column in range(2)]
     patch_axis.plot(range(len(case["patch_deltas"])), case["patch_deltas"], marker=".")
     patch_axis.axhline(0, color="black", linewidth=0.5)
+    reference = case["clean_score"] - case["contrast_score"]
+    patch_axis.axhline(
+        reference, color="#65727b", linestyle="--", linewidth=1.2, zorder=0
+    )
+    patch_axis.set_ylim(top=max(reference, *case["patch_deltas"]) + 1.0)
+    patch_axis.text(
+        0.98,
+        reference + 0.08,
+        "F(clean) - F(contrast) = -ΔF_input\n"
+        f"{reference:+.3f} · tham chiếu, không là ngưỡng",
+        transform=patch_axis.get_yaxis_transform(),
+        ha="right",
+        va="bottom",
+        color="#4e5961",
+        fontsize=11,
+    )
     patch_axis.set(xlabel="Tầng decoder", ylabel="ΔF_patch")
     patch_axis.set_title(
         "PATCH  ·  Kích hoạt cue clean/contrast + F → ΔF theo tầng",
@@ -372,6 +406,7 @@ def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
         abs(value) for item in data["cases"] for value in item["token_attribution"]
     )
     _draw_signed_prompt(ig_axis, case, tokenizer, size=14, scale=scale)
+    _draw_ig_scale(ig_axis, scale, (0.10, 0.15, 0.76, 0.06))
     ig_axis.text(
         0,
         7.7,
@@ -430,6 +465,7 @@ def render(data: dict) -> None:
         f"{scale:.3f}: đỏ giảm F về y-; xanh tăng F về y+",
         fontsize=14,
     )
+    _draw_ig_scale(axes[0], scale, (0.54, 0.64, 0.42, 0.08))
     fig.savefig(
         FIGURES / "integrated-gradients-token-attribution.svg",
         metadata={"Date": None},
