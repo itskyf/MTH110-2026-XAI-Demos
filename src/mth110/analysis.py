@@ -3,6 +3,7 @@
 import csv
 import json
 import math
+import textwrap
 from pathlib import Path
 
 import matplotlib as mpl
@@ -124,7 +125,9 @@ def render(data: dict) -> None:
         data["tokenizer"], revision=data["tokenizer_revision"]
     )
     FIGURES.mkdir(exist_ok=True)
-    plt.rcParams["svg.fonttype"] = "none"
+    plt.rcParams.update(
+        {"font.size": 13, "svg.fonttype": "none", "svg.hashsalt": "mth110"}
+    )
 
     fig, axes = plt.subplots(
         len(data["cases"]), 1, figsize=(16, 12), layout="constrained"
@@ -150,10 +153,13 @@ def render(data: dict) -> None:
             list(positions),
             tokenizer.convert_ids_to_tokens(case["clean_token_ids"]),
             rotation=90,
-            fontsize=7,
+            fontsize=10,
         )
         axis.legend(loc="upper right")
-    fig.savefig(FIGURES / "integrated-gradients-token-attribution.svg")
+    fig.savefig(
+        FIGURES / "integrated-gradients-token-attribution.svg",
+        metadata={"Date": None},
+    )
     plt.close(fig)
 
     fig, axis = plt.subplots(figsize=(9, 4), layout="constrained")
@@ -167,8 +173,85 @@ def render(data: dict) -> None:
     axis.axhline(0, color="black", linewidth=0.5)
     axis.set(xlabel="Decoder layer", ylabel="Clean-to-contrast patch effect on F")
     axis.legend()
-    fig.savefig(FIGURES / "activation-patching-layer-effects.svg")
+    fig.savefig(
+        FIGURES / "activation-patching-layer-effects.svg",
+        metadata={"Date": None},
+    )
     plt.close(fig)
+
+    case = next(case for case in data["cases"] if case["case"] == "arithmetic")
+    fig, axes = plt.subplots(
+        4,
+        1,
+        figsize=(16, 10),
+        layout="constrained",
+        gridspec_kw={"height_ratios": (1.2, 0.7, 3, 2)},
+    )
+    explanation = " ".join(case["self_explanation"].replace("**", "").split())
+    axes[0].axis("off")
+    axes[0].text(
+        0,
+        0.8,
+        "Recorded self-explanation (elicited after the A/B choice)",
+        weight="bold",
+        transform=axes[0].transAxes,
+    )
+    axes[0].text(
+        0,
+        0.5,
+        textwrap.fill(explanation, width=110),
+        va="center",
+        transform=axes[0].transAxes,
+    )
+    axes[1].axis("off")
+    axes[1].text(
+        0,
+        0.8,
+        f"Measured choice: {case['selected_label']}  |  "
+        f"F(clean) = {case['clean_score']:.3f}  |  "
+        f"F(contrast) = {case['contrast_score']:.3f}  |  "
+        f"ΔF_input = {case['input_delta']:.3f}",
+        weight="bold",
+        transform=axes[1].transAxes,
+    )
+    values = case["token_attribution"]
+    positions = range(len(values))
+    axes[2].bar(
+        positions,
+        values,
+        color=["#c0504d" if value < 0 else "#3978a8" for value in values],
+    )
+    axes[2].axhline(0, color="black", linewidth=0.5)
+    axes[2].axvline(
+        case["cue_position"],
+        color="#277b45",
+        linewidth=1.7,
+        label=f"Frozen cue (IG = {values[case['cue_position']]:.3f})",
+    )
+    axes[2].set(
+        title="Signed token-level Integrated Gradients (clean input)",
+        ylabel="Signed IG",
+    )
+    axes[2].set_xticks(
+        list(positions),
+        tokenizer.convert_ids_to_tokens(case["clean_token_ids"]),
+        rotation=90,
+        fontsize=11,
+    )
+    axes[2].legend(loc="upper right")
+    axes[3].plot(range(len(case["patch_deltas"])), case["patch_deltas"], marker=".")
+    axes[3].axhline(0, color="black", linewidth=0.5)
+    axes[3].set(
+        title="Clean-to-contrast cue activation patching",
+        xlabel="Decoder layer",
+        ylabel="Effect on F",
+    )
+    fig.savefig(FIGURES / "arithmetic-case-comparison.svg", metadata={"Date": None})
+    plt.close(fig)
+    for path in FIGURES.glob("*.svg"):
+        path.write_text(
+            "\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n"
+        )
 
 
 if __name__ == "__main__":
