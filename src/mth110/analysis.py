@@ -1,5 +1,6 @@
-"""Check the frozen numerical evidence and plot its case-level results."""
+"""Check the frozen numerical evidence, write a summary, and plot case-level results."""
 
+import csv
 import json
 import math
 from pathlib import Path
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 
 SOURCE = Path("data/frozen.json")
+SUMMARY = Path("data/evidence-summary.csv")
 FIGURES = Path("docs/report/figures")
 
 
@@ -84,6 +86,38 @@ def load() -> dict:
     return data
 
 
+def write_summary(data: dict) -> None:
+    """Write a local CSV summary directly from the canonical recorded values."""
+    SUMMARY.parent.mkdir(exist_ok=True)
+    with SUMMARY.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(
+            (
+                "case",
+                "selected_label",
+                "correct_label",
+                "clean_score",
+                "contrast_score",
+                "input_delta",
+                "cue_ig",
+                "ig_completeness_delta",
+            )
+        )
+        for case in data["cases"]:
+            writer.writerow(
+                (
+                    case["case"],
+                    case["selected_label"],
+                    case["correct_label"],
+                    case["clean_score"],
+                    case["contrast_score"],
+                    case["input_delta"],
+                    case["token_attribution"][case["cue_position"]],
+                    case["ig_completeness_delta"],
+                )
+            )
+
+
 def render(data: dict) -> None:
     """Plot signed token attribution and layer-wise patch effects."""
     tokenizer = AutoTokenizer.from_pretrained(
@@ -138,4 +172,6 @@ def render(data: dict) -> None:
 
 
 if __name__ == "__main__":
-    render(load())
+    evidence = load()
+    write_summary(evidence)
+    render(evidence)

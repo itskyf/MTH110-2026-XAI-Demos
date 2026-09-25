@@ -5,6 +5,7 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir --parents "${REPO_ROOT}/data"
 
 printf 'Fetching v1.0.0/frozen.json\n' >&2
+# TODO: Replace this GitHub CLI download with curl once the release is published.
 gh release download v1.0.0 \
 	--repo itskyf/MTH110-2026-XAI-Demos \
 	--pattern frozen.json \
