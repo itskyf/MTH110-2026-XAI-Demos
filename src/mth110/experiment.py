@@ -1,9 +1,10 @@
-"""Run the Issue #1 calibration checks on the frozen Qwen3 behavior."""
+"""Run the frozen Qwen3 experiment and record its case-level evidence."""
 
 import json
 import math
-import sys
+import platform
 from importlib import metadata
+from pathlib import Path
 
 import torch
 from captum.attr import IntegratedGradients
@@ -31,6 +32,13 @@ CASES = (
         "B",
     ),
 )
+RESULTS = Path("data/frozen.json")
+
+
+def _score(logits: torch.Tensor, targets: tuple[int, int]) -> torch.Tensor:
+    """Return the correct-label minus alternative-label logit difference."""
+    positive, negative = targets
+    return logits[..., positive] - logits[..., negative]
 
 
 def _tokens_for_case(
@@ -72,7 +80,7 @@ def _explain(
     question: str,
     cue: str,
     selected: str,
-) -> str:
+) -> tuple[str, str]:
     user = (
         f"{question}\nCue: {cue}\nThe selected answer label was {selected}. "
         "In one sentence, explain why that label was selected."
@@ -90,7 +98,9 @@ def _explain(
         generated = model.generate(
             ids, do_sample=False, max_new_tokens=64, pad_token_id=tokenizer.eos_token_id
         )
-    return tokenizer.decode(generated[0, ids.shape[1] :], skip_special_tokens=True)
+    return prefix, tokenizer.decode(
+        generated[0, ids.shape[1] :], skip_special_tokens=True
+    )
 
 
 def _attribute(
@@ -100,7 +110,6 @@ def _attribute(
     clean_tokens: list[int],
     targets: tuple[int, int],
 ) -> tuple[list[float], float, float, int]:
-    positive, negative = targets
     empty_prefix = tokenizer.apply_chat_template(
         [{"role": "user", "content": ""}],
         tokenize=False,
@@ -137,13 +146,12 @@ def _attribute(
             attention_mask=attention_mask.expand(inputs_embeds.shape[0], -1),
             use_cache=False,
         ).logits[:, -1]
-        return logits[:, positive] - logits[:, negative]
+        return _score(logits, targets)
 
     with torch.no_grad():
         embedding_score = target_score(embeddings)[0]
         baseline_score = target_score(baseline)[0]
-        direct_score = model(input_ids=clean_ids).logits[0, -1]
-        direct_score = direct_score[positive] - direct_score[negative]
+        direct_score = _score(model(input_ids=clean_ids).logits[0, -1], targets)
     if not torch.isfinite(
         torch.stack((direct_score, embedding_score, baseline_score))
     ).all():
@@ -175,24 +183,30 @@ def _patch(
     contrast_ids: torch.Tensor,
     position: int,
     targets: tuple[int, int],
-) -> float:
-    positive, negative = targets
+) -> list[float]:
     traced = NNsight(model)
-    with torch.no_grad():
-        with traced.trace(clean_ids):
-            clean_activation = traced.model.layers[0].output.save()
-        with traced.trace(contrast_ids):
-            traced.model.layers[0].output[:, position, :] = clean_activation[
-                :, position, :
-            ]
-            patched_logits = traced.output.logits.save()
-    return float(patched_logits[0, -1, positive] - patched_logits[0, -1, negative])
+    scores = []
+    for layer in range(len(model.model.layers)):
+        with torch.no_grad():
+            with traced.trace(clean_ids):
+                clean_activation = traced.model.layers[layer].output.save()
+            with traced.trace(contrast_ids):
+                traced.model.layers[layer].output[:, position, :] = clean_activation[
+                    :, position, :
+                ]
+                patched_logits = traced.output.logits.save()
+        score = float(_score(patched_logits[0, -1], targets))
+        if not math.isfinite(score):
+            msg = f"The patched target score is non-finite at layer {layer}."
+            raise RuntimeError(msg)
+        scores.append(score)
+    return scores
 
 
 def main() -> None:
-    """Check scoring, explanation, IG completeness, and one residual patch."""
+    """Run every frozen case and save the evidence needed for later analysis."""
     if not torch.cuda.is_available():
-        msg = "The frozen calibration uses a CUDA GPU."
+        msg = "The frozen experiment uses a CUDA GPU."
         raise RuntimeError(msg)
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
@@ -205,75 +219,107 @@ def main() -> None:
         raise ValueError(msg)
 
     case_tokens = [_tokens_for_case(tokenizer, case) for case in CASES]
-    name, question, correct, alternative = CASES[0]
-    clean_tokens, contrast_tokens, cue_position = case_tokens[0]
     model = AutoModelForCausalLM.from_pretrained(
         MODEL, revision=REVISION, dtype=torch.float32, attn_implementation="eager"
     ).to("cuda")
     model.eval()
     torch.backends.cuda.matmul.allow_tf32 = False
 
-    clean_ids = torch.tensor([clean_tokens], device="cuda")
-    contrast_ids = torch.tensor([contrast_tokens], device="cuda")
-    positive, negative = label_ids[correct][0], label_ids[alternative][0]
-    targets = (positive, negative)
+    results = []
+    for case, (clean_tokens, contrast_tokens, cue_position) in zip(
+        CASES, case_tokens, strict=True
+    ):
+        name, question, correct, alternative = case
+        clean_ids = torch.tensor([clean_tokens], device="cuda")
+        contrast_ids = torch.tensor([contrast_tokens], device="cuda")
+        targets = (label_ids[correct][0], label_ids[alternative][0])
 
-    with torch.no_grad():
-        clean_logits = model(input_ids=clean_ids).logits[0, -1]
-        contrast_logits = model(input_ids=contrast_ids).logits[0, -1]
-        clean_score = clean_logits[positive] - clean_logits[negative]
-        contrast_score = contrast_logits[positive] - contrast_logits[negative]
-    if not torch.isfinite(torch.stack((clean_score, contrast_score))).all():
-        msg = "The clean or contrast target score is non-finite."
-        raise RuntimeError(msg)
+        with torch.no_grad():
+            clean_logits = model(input_ids=clean_ids).logits[0, -1]
+            contrast_logits = model(input_ids=contrast_ids).logits[0, -1]
+            clean_score = _score(clean_logits, targets)
+            contrast_score = _score(contrast_logits, targets)
+        if not torch.isfinite(torch.stack((clean_score, contrast_score))).all():
+            msg = f"The clean or contrast target score is non-finite for {name}."
+            raise RuntimeError(msg)
+        if clean_score == 0:
+            msg = f"The A and B logits are tied for {name}."
+            raise RuntimeError(msg)
 
-    selected = correct if clean_score >= 0 else alternative
-    explanation = _explain(model, tokenizer, question, correct, selected)
-    token_attribution, baseline_score, convergence_delta, space_id = _attribute(
-        model, tokenizer, clean_ids, clean_tokens, targets
-    )
-    patched_score = _patch(model, clean_ids, contrast_ids, cue_position, targets)
-    if not math.isfinite(patched_score):
-        msg = "The patched target score is non-finite."
-        raise RuntimeError(msg)
+        selected = correct if clean_score > 0 else alternative
+        explanation_prefix, explanation = _explain(
+            model, tokenizer, question, correct, selected
+        )
+        token_attribution, baseline_score, convergence_delta, space_id = _attribute(
+            model, tokenizer, clean_ids, clean_tokens, targets
+        )
+        patched_scores = _patch(model, clean_ids, contrast_ids, cue_position, targets)
+        results.append(
+            {
+                "case": name,
+                "question": question,
+                "correct_label": correct,
+                "alternative_label": alternative,
+                "clean_prefix": PRIMARY_PREFIX.format(question=question, cue=correct),
+                "contrast_prefix": PRIMARY_PREFIX.format(
+                    question=question, cue=alternative
+                ),
+                "explanation_prefix": explanation_prefix,
+                "clean_token_ids": clean_tokens,
+                "contrast_token_ids": contrast_tokens,
+                "cue_position": cue_position,
+                "clean_score": float(clean_score),
+                "contrast_score": float(contrast_score),
+                "input_delta": float(contrast_score - clean_score),
+                "selected_label": selected,
+                "self_explanation": explanation,
+                "baseline_score": baseline_score,
+                "space_token_id": space_id,
+                "token_attribution": token_attribution,
+                "ig_completeness_delta": convergence_delta,
+                "patched_scores": patched_scores,
+                "patch_deltas": [
+                    score - float(contrast_score) for score in patched_scores
+                ],
+            }
+        )
 
-    json.dump(
-        {
-            "case": name,
-            "model": MODEL,
-            "revision": REVISION,
-            "versions": {
-                package: metadata.version(package)
-                for package in (
-                    "torch",
-                    "transformers",
-                    "captum",
-                    "nnsight",
-                    "tokenizers",
-                )
-            },
-            "device": torch.cuda.get_device_name(),
-            "dtype": "torch.float32",
-            "primary_prefix": PRIMARY_PREFIX.format(question=question, cue=correct),
-            "target_ids": {
-                label: token_ids[0] for label, token_ids in label_ids.items()
-            },
-            "cue_position": cue_position,
-            "space_token_id": space_id,
-            "clean_score": float(clean_score),
-            "contrast_score": float(contrast_score),
-            "baseline_score": float(baseline_score),
-            "selected_label": selected,
-            "self_explanation": explanation,
-            "token_attribution": token_attribution,
-            "ig_completeness_delta": convergence_delta,
-            "patched_score_layer_0": patched_score,
-            "patch_delta_layer_0": patched_score - float(contrast_score),
+    output = {
+        "model": MODEL,
+        "revision": REVISION,
+        "tokenizer": MODEL,
+        "tokenizer_revision": REVISION,
+        "python_version": platform.python_version(),
+        "versions": {
+            package: metadata.version(package)
+            for package in ("torch", "transformers", "captum", "nnsight", "tokenizers")
         },
-        sys.stdout,
-        indent=2,
-    )
-    sys.stdout.write("\n")
+        "device": torch.cuda.get_device_name(),
+        "cuda_runtime": torch.version.cuda,
+        "dtype": "torch.float32",
+        "attention": "eager",
+        "tf32": False,
+        "evaluation_mode": True,
+        "target_ids": {label: ids[0] for label, ids in label_ids.items()},
+        "target_score": "correct_minus_alternative_next_token_logits",
+        "explanation_generation": {
+            "do_sample": False,
+            "max_new_tokens": 64,
+            "pad_token_id": tokenizer.eos_token_id,
+        },
+        "ig_baseline": "space_embedding_at_user_content_positions",
+        "ig_path": "straight_embedding_path_to_clean_input",
+        "ig_method": "riemann_middle",
+        "ig_steps": 1024,
+        "ig_aggregation": "signed_embedding_sum",
+        "input_intervention": "contrast_score_minus_clean_score",
+        "patch_direction": "clean_to_contrast",
+        "patch_location": "cue_token_full_layer_output",
+        "command": "pixi run --locked python -m mth110.experiment",
+        "cases": results,
+    }
+    RESULTS.parent.mkdir(exist_ok=True)
+    RESULTS.write_text(json.dumps(output, indent=2, allow_nan=False) + "\n")
 
 
 if __name__ == "__main__":

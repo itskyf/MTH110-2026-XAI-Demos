@@ -38,6 +38,16 @@ hk check --all
 hk run pre-commit
 ```
 
+Run the frozen three-case experiment on a CUDA GPU with:
+
+```shell
+pixi run --locked python -m mth110.experiment
+```
+
+The command writes the case-level evidence and run metadata to `data/frozen.json`.
+After PR review and merge, the finalized JSON is published as an immutable GitHub
+Release asset; reruns use a new tag and release.
+
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the collaboration and verification workflow.
 
 ## Repository Map
