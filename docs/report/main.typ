@@ -21,17 +21,19 @@
 
 *Tóm tắt.* Báo cáo hỏi: đối với một hành vi sinh cục bộ đã cố định, lời tự giải thích, phép thay đổi đầu vào có kiểm soát, Integrated Gradients (IG), và phép thay thế kích hoạt nội bộ cung cấp những bằng chứng bổ sung nào, và chúng đồng thuận hay bất đồng ở đâu? Trên ba trường hợp đã đóng băng của Qwen3-0.6B, trường hợp số học cho thấy điểm đo chọn nhãn sai A rất sát ranh giới, trong khi lời tự giải thích lại khẳng định B là đáp án đúng và nhắc đến tín hiệu gợi ý B. Phép đổi duy nhất tín hiệu ấy và phép thay thế kích hoạt tại vị trí của nó làm thay đổi điểm theo hướng phù hợp với tác động của tín hiệu; IG gán cho token này giá trị dương theo một đường tham chiếu nhân tạo. Các phép đo nói về các đối tượng và can thiệp khác nhau. Chúng không chứng minh lời tự giải thích trung thực hay xác lập toàn bộ cơ chế suy luận.
 
-#block(fill: luma(245), inset: 7pt, width: 100%)[
-  #text(size: 8.8pt)[
-    *Mô hình gốc:* lời nhắc → Qwen → logits tại vị trí trả lời đầu tiên → nhãn A/B được đo. Từ hai logit, nghiên cứu tính $F = z_(y^+) - z_(y^-)$ để lượng hóa ưu thế tương đối giữa hai nhãn.
+#block(fill: luma(245), inset: 8pt, width: 100%)[
+  #text(font: "Noto Sans", size: 8.8pt)[
+    *MÔ HÌNH GỐC*　 lời nhắc → Qwen → logits ở token trả lời đầu → nhãn A/B được đo
 
-    *Bằng chứng về hành vi ấy:* tự giải thích → phát biểu; đổi cue → $Delta F_"input"$; IG → attribution có dấu theo token; patch kích hoạt → $Delta F^"patch"$ theo tầng.
+    *ĐẠI LƯỢNG NGHIÊN CỨU*　 hai logit → $F = z_(y^+) - z_(y^-)$, ưu thế tương đối A/B
+
+    *BẰNG CHỨNG VỀ HÀNH VI ẤY*　 tự giải thích → phát biểu; đổi cue → $Delta F_"input"$; IG → attribution có dấu; patch kích hoạt → $Delta F^"patch"$ theo tầng.
   ]
 ]
 
 = Câu hỏi và khung GenXAI
 
-Schneider (2024) phân biệt *đầu ra của thuật toán GenXAI* (lời giải thích) với thông tin đầu vào và nội bộ mà phương pháp XAI cần để tạo ra lời giải thích ấy. Ông cũng phân biệt phạm vi của lời giải thích theo phần đầu ra và quan hệ đầu vào–đầu ra của *hệ AI gốc* được giải thích. Các chiều phạm vi này nói về *cái gì của hệ AI gốc được giải thích*, không phải cổng vào/ra của thuật toán XAI. Ở đây, đầu vào gốc là lời nhắc, còn đầu ra gốc tại vị trí trả lời đầu tiên là logits của mô hình; so sánh logits A/B cho nhãn được đo. *Dự án không giải thích toàn bộ quá trình sinh của mô hình.* Nó tập trung vào một thuộc tính đầu ra hẹp: ưu thế tương đối giữa hai token đáp án A/B tại vị trí sinh đầu tiên, được vận hành hóa bằng $F$ trong một quan hệ đầu vào–đầu ra đơn lẻ. Bản thân $F$ không phải câu trả lời tự nhiên của mô hình và cũng không phải lời giải thích. Lời nhắc và mô hình là hai nguồn nền tảng; dữ liệu huấn luyện và quá trình tối ưu không được khảo sát. Khung phân loại và các desiderata như tính trung thực, tính hợp lý bề ngoài, tính đầy đủ, độ nhạy và độ vững đến từ Schneider; quy trình so sánh bốn dạng bằng chứng là thiết kế của dự án này.
+Schneider (2024) phân biệt *đầu ra của thuật toán GenXAI* (lời giải thích) với thông tin đầu vào và nội bộ mà phương pháp XAI cần để tạo ra lời giải thích ấy. Ông cũng phân biệt phạm vi của lời giải thích theo phần đầu ra và quan hệ đầu vào–đầu ra của *hệ AI gốc* được giải thích. Các chiều phạm vi này nói về *cái gì của hệ AI gốc được giải thích*, không phải cổng vào/ra của thuật toán XAI. Ở đây, đầu vào gốc là lời nhắc, còn đầu ra gốc tại vị trí trả lời đầu tiên là logits của mô hình; so sánh logits A/B cho nhãn được đo. *Dự án không giải thích toàn bộ quá trình sinh của mô hình.* Nó tập trung vào một thuộc tính đầu ra hẹp: ưu thế tương đối giữa hai token đáp án A/B tại vị trí sinh đầu tiên, được vận hành hóa bằng $F$ trong một quan hệ đầu vào–đầu ra đơn lẻ. $F$ là đại lượng nghiên cứu suy ra từ logits, không phải đầu ra ngôn ngữ tự nhiên của mô hình hay một lời giải thích. Lời nhắc và mô hình là hai nguồn nền tảng; dữ liệu huấn luyện và quá trình tối ưu không được khảo sát. Khung phân loại và các desiderata như tính trung thực, tính hợp lý bề ngoài, tính đầy đủ, độ nhạy và độ vững đến từ Schneider; quy trình so sánh bốn dạng bằng chứng là thiết kế của dự án này.
 
 Lời tự giải thích do chính mô hình sinh ra sau khi quyết định đã được cố định, nên chỉ cần truy cập đầu ra kiểu hộp đen. Phép đổi tín hiệu gợi ý quan sát tác động hành vi; nhãn chọn có thể thấy bằng hộp đen, còn chênh lệch logit $F$ cụ thể cần truy cập điểm số kiểu hộp xám. IG cần gradient và embedding; thay thế kích hoạt cần trạng thái nội bộ, nên hai phép này đòi hỏi truy cập hộp trắng. Theo Schneider, phân biệt *mô hình tự giải thích* với *thuật toán giải thích* cũng quan trọng: văn bản do mô hình phát biểu không phải phép đo trực tiếp của tính toán nội bộ. Bảng sau tách đầu vào và kết quả của từng bước; một số kết quả là hiện vật giải thích, số khác là đại lượng can thiệp. Cột cuối nói rõ mỗi dạng bằng chứng soi sáng hành vi nào và giới hạn của nó đối với tính trung thực, chứ không xếp hạng phương pháp.
 
@@ -70,6 +72,22 @@ Lời tự giải thích do chính mô hình sinh ra sau khi quyết định đ�
   )
 ]
 
+= Kết quả: cùng một trường hợp, bốn phạm vi bằng chứng
+
+@comparison đặt hành vi gốc trước các phép đo khác. Lượt clean dùng `Cue: B`, nhưng $F(x^"clean")=-0.043$ hơi ưu tiên A, nhãn sai so với phép tính $7+5=12$. Đổi cue từ B sang A cho $F(x^"contrast")=-4.478$ và $Delta F_"input"=-4.435$: nhãn sai A vẫn được ưu tiên, nhưng mạnh hơn. Đó là tác động của đúng phép đổi đầu vào đã cố định, không tự chỉ ra cơ chế.
+
+Cue trên đầu vào clean có IG dương $0.839$ dọc đường baseline → clean, đồng thời các token khác cũng có đóng góp dương hoặc âm đáng kể. Patch kích hoạt cue từ clean vào lượt contrast ở các tầng đầu tăng $F$ khoảng $4.4$, gần đảo ngược hiệu ứng đầu vào đã đo; hiệu ứng giảm về gần không ở các tầng cuối. IG và patch đo hai phép biến đổi khác nhau, vì vậy không được đọc cue như nguyên nhân duy nhất hay suy ra một mạch nội bộ đầy đủ.
+
+Lời tự giải thích từ lượt hỏi riêng lại nói "The correct answer is B) 12" và "Cue: B is correct". Phát biểu B *bất đồng* với lựa chọn A đã đo; không nên "sửa" câu chữ của mô hình hay coi văn bản ấy là mô tả trung thực của lựa chọn A. Sự tương ứng về dấu giữa IG cue, đổi đầu vào và patch là bằng chứng hội tụ về liên quan của cue đối với $F$ dưới ba phạm vi khác nhau. Nó không xác nhận lời tự giải thích hay toàn bộ thuật toán mà mô hình dùng.
+
+#page(flipped: true)[
+  #figure(
+    image("figures/arithmetic-case-comparison.svg", width: 100%),
+    caption: [Bằng chứng số học từ `v1.0.0/frozen.json`: hai lượt mô hình chọn A và cho $F$; lượt tự giải thích riêng phát biểu B. Đổi cue cho $Delta F_"input"$, IG cho attribution có dấu, patch cho hiệu ứng theo tầng. Cue có tác động trong các phép can thiệp này, nhưng kết quả không xác lập cơ chế đầy đủ hay giải thích trung thực cho lựa chọn A.],
+  ) <comparison>
+]
+
+
 = Thiết kế và ý nghĩa toán học
 
 Thí nghiệm dùng checkpoint Qwen/Qwen3-0.6B tại revision `c1899de289a04d12100db370d81485cdf75e47ca`, float32, chế độ đánh giá và cùng vị trí sinh token sau khuôn chat không bật chế độ suy nghĩ. Mỗi câu hỏi có hai nhãn A/B, với $y^+$ là nhãn đúng và $y^-$ là nhãn còn lại. Cả hai là token đơn theo tokenizer đã cố định. Điểm đích dùng xuyên suốt là
@@ -80,19 +98,19 @@ trong đó $z_y$ là logit trước softmax tại vị trí trả lời cố đ�
 
 == Lời tự giải thích
 
-*Hành vi cần giải thích* là nhãn A/B được đo từ hai logit ở lượt trả lời đầu tiên. *Đầu vào của phép tự giải thích* là một lời nhắc riêng chứa câu hỏi và nhãn đã chọn; *đầu ra* là văn bản mô hình phát biểu về lý do chọn nhãn. Lượt này sinh tham lam, tối đa 64 token mới. Vì nhãn được cung cấp trong lời nhắc thứ hai, phát biểu không phải một quyết định độc lập. Văn bản cho biết mô hình *nói* lý do gì; mức hợp lý bề ngoài không chứng minh văn bản phản ánh phép tính gây ra lựa chọn. Ở trường hợp số học, phát biểu chọn B không khớp nhãn A đã đo, nên không thể coi chính phát biểu đó là mô tả trung thực của lựa chọn A. Điều này không cho phép kết luận mọi lời tự giải thích đều thiếu trung thực. Nghiên cứu của Turpin và cộng sự (2023) cho thấy trong thiết lập chain-of-thought khác, mô hình có thể chịu ảnh hưởng của tín hiệu gây thiên lệch mà không nói ra; công trình đó củng cố lý do thận trọng, không thay thế phép đo của dự án.
+*Giải thích gì?* Nhãn A/B được đo ở lượt trả lời đầu tiên. *Đầu vào → đầu ra:* lời nhắc riêng chứa câu hỏi và nhãn đã chọn → văn bản mô hình phát biểu về lý do chọn nhãn. *Bằng chứng:* mô hình *nói* lý do gì. *Liên hệ với tính trung thực:* phát biểu B ở ca số học bất đồng với lựa chọn A đã đo, nên không thể coi chính phát biểu ấy là mô tả trung thực cho lựa chọn A. *Giới hạn chính:* mức hợp lý bề ngoài không chứng minh văn bản phản ánh phép tính gây ra lựa chọn, và một ca bất đồng không cho phép kết luận mọi lời tự giải thích đều thiếu trung thực. Lượt này sinh tham lam, tối đa 64 token mới; vì nhãn đã có trong lời nhắc thứ hai, phát biểu không phải quyết định độc lập. Nghiên cứu của Turpin và cộng sự (2023) cho thấy trong thiết lập chain-of-thought khác, mô hình có thể chịu ảnh hưởng của tín hiệu gây thiên lệch mà không nói ra; công trình đó củng cố lý do thận trọng, không thay thế phép đo của dự án.
 
 == Can thiệp đầu vào có kiểm soát
 
-*Hành vi được kiểm tra* là mức ưu thế A/B khi cue đổi từ lời nhắc clean sang contrast. *Đầu vào của phép can thiệp* là hai lời nhắc chỉ khác một token cue; *đầu ra* là chênh lệch điểm $F$ của hai lượt mô hình. Đổi cue được định trước khi xem bản đồ IG, và hiệu ứng đầu vào hữu hạn là
+*Giải thích gì?* Mức ưu thế A/B khi cue đổi từ lời nhắc clean sang contrast. *Đầu vào → đầu ra:* hai lời nhắc chỉ khác một token cue và điểm $F$ của hai lượt → chênh lệch $Delta F_"input"$. *Bằng chứng:* tác động hành vi của đúng phép đổi cue. *Liên hệ với tính trung thực:* nó kiểm tra một phát biểu về vai trò cue trong hành vi đo được, nhưng không xác nhận toàn bộ lời tự giải thích. *Giới hạn chính:* kết quả không tự xác định cơ chế nội bộ hay suy rộng sang mọi cách viết tương đương. Đổi cue được định trước khi xem bản đồ IG, và hiệu ứng đầu vào hữu hạn là
 
 $ Delta F_"input" = F(x^"contrast") - F(x^"clean"). $
 
-Giá trị âm nghĩa là phép đổi làm giảm ưu thế logit của nhãn đúng. Vì chỉ cue thay đổi, kết quả hỗ trợ nhận định nhân quả cho đúng phép đổi đầu vào này. Nó không phải đạo hàm cục bộ, không suy rộng sang mọi cách viết tương đương của lời nhắc, và không tự xác định cơ chế nội bộ gây tác động. Bằng chứng này có liên quan đến tính trung thực của phát biểu về cue, nhưng không tự kiểm chứng toàn bộ văn bản tự giải thích.
+Giá trị âm nghĩa là phép đổi làm giảm ưu thế logit của nhãn đúng. Vì chỉ cue thay đổi, kết quả hỗ trợ nhận định nhân quả cho đúng phép đổi đầu vào này; nó không phải đạo hàm cục bộ.
 
 == IG và phép kiểm tra số học
 
-*Hành vi được soi sáng* là ưu thế A/B ở đầu vào clean, lượng hóa bằng $F$. *Đầu vào của IG* là embedding clean $e$, tham chiếu $e'$, gradient của $F$ dọc đường nối chúng; *đầu ra* là đóng góp có dấu theo token cho $F(e)-F(e')$. Phép này cho biết token nào được quy đóng góp dọc đường embedding đã chọn, không cho biết một token có phải cơ chế nhân quả duy nhất hay không. Với đường thẳng nối hai điểm, IG theo chiều $i$ được định nghĩa bởi
+*Giải thích gì?* Ưu thế A/B ở đầu vào clean, lượng hóa bằng $F$. *Đầu vào → đầu ra:* embedding clean $e$, tham chiếu $e'$ và gradient của $F$ dọc đường nối → attribution có dấu theo token cho $F(e)-F(e')$. *Bằng chứng:* token nào được quy đóng góp dọc đường embedding đã chọn. *Liên hệ với tính trung thực:* completeness kiểm phép tính attribution, không kiểm lời tự giải thích. *Giới hạn chính:* attribution này không chứng minh token là cơ chế nhân quả duy nhất và không trực tiếp đo phép đổi cue. Với đường thẳng nối hai điểm, IG theo chiều $i$ được định nghĩa bởi
 
 $
   "IG"_i(e) = (e_i-e'_i) integral_0^1 (partial F(e' + alpha(e-e')))/(partial e_i) dif alpha.
@@ -104,7 +122,7 @@ Phép kiểm tra số học so sánh $sum_i "IG"_i$ với $F(e)-F(e')$. Phần d
 
 == Thay thế kích hoạt
 
-*Hành vi được kiểm tra* là ưu thế A/B của lượt contrast khi phục hồi một biểu diễn nội bộ từ lượt clean. *Đầu vào của phép patch* là kích hoạt cue clean và contrast cùng hàm điểm $F$; *đầu ra* là thay đổi $F$ theo tầng khi thay vector cue. Tại mỗi tầng decoder $ell$, thí nghiệm lấy toàn bộ vector đầu ra residual stream ở vị trí token cue từ lượt clean, thay đúng vector đó vào lượt contrast, rồi tính lại $F$. Hiệu ứng là
+*Giải thích gì?* Ưu thế A/B của lượt contrast khi phục hồi một biểu diễn nội bộ từ lượt clean. *Đầu vào → đầu ra:* kích hoạt cue clean/contrast và $F$ → thay đổi $F$ theo tầng khi thay vector cue. *Bằng chứng:* biểu diễn được phục hồi có thể làm thay đổi hành vi dưới đúng can thiệp này. *Liên hệ với tính trung thực:* tác động nội bộ bổ sung bằng chứng về vai trò cue, nhưng không xác nhận văn bản tự giải thích. *Giới hạn chính:* tác động không chứng minh vector là cần thiết hay vạch ra cơ chế đầy đủ. Tại mỗi tầng decoder $ell$, thí nghiệm lấy toàn bộ vector đầu ra residual stream ở vị trí token cue từ lượt clean, thay đúng vector đó vào lượt contrast, rồi tính lại $F$. Hiệu ứng là
 
 $
   Delta F_(ell,k)^"patch" = F(x^"contrast"; "do"(h_(ell,k) = h_(ell,k)^"clean")) - F(x^"contrast"),
@@ -112,28 +130,17 @@ $
 
 với $k$ là vị trí cue đã căn chỉnh. Dấu dương nghĩa là can thiệp clean-to-contrast làm điểm nghiêng về nhãn đúng so với lượt contrast chưa patch. Theo Heimersheim và Nanda (2024), diễn giải activation patching phụ thuộc cách chọn lượt nguồn, lượt nhận, vị trí và metric. Kết quả hỗ trợ vai trò nhân quả của biểu diễn được phục hồi *dưới đúng can thiệp này*, một dạng bằng chứng hẹp về khả năng làm thay đổi hành vi; nó không chứng minh vector ấy là cần thiết, không tách được một mạch hoàn chỉnh, và hiệu ứng yếu ở tầng muộn không chứng minh cue đã hết ảnh hưởng vì thông tin có thể đã lan sang vị trí khác.
 
-= Kết quả: cùng một trường hợp, bốn phạm vi bằng chứng
+= Bằng chứng chi tiết theo ba trường hợp
 
-@comparison đặt hành vi gốc trước rồi mới đặt bốn dạng bằng chứng bên cạnh. Lượt clean dùng `Cue: B`, nhưng điểm $F(x^"clean")=-0.043$ hơi ưu tiên A, nhãn sai so với phép tính $7+5=12$. Lời tự giải thích từ lượt hỏi riêng lại nói "The correct answer is B) 12" và "Cue: B is correct". Mâu thuẫn trực tiếp giữa nhãn *đã đo/chọn* A và lời giải thích B là kết quả của hồ sơ đóng băng; không nên "sửa" câu chữ của mô hình hay coi văn bản ấy là mô tả trung thực của lựa chọn A.
-
-Đổi cue từ B sang A cho $F(x^"contrast")=-4.478$ và $Delta F_"input"=-4.435$: nhãn sai A vẫn được ưu tiên, nhưng mạnh hơn. Cue trên đầu vào clean có IG dương $0.839$, đồng thời các token khác cũng có đóng góp dương hoặc âm đáng kể; không được đọc cue như nguyên nhân duy nhất. Patch ở các tầng đầu tăng $F$ của lượt contrast khoảng $4.4$, gần đảo ngược hiệu ứng đầu vào đã đo; hiệu ứng giảm về gần không ở các tầng cuối. Cả hai can thiệp chỉ nói về đúng token cue và hướng thay đổi đã đóng băng. Sự tương ứng về dấu giữa IG cue, đổi đầu vào và patch là bằng chứng hội tụ về liên quan của cue đối với $F$, trong khi lời tự giải thích không khớp lựa chọn đã đo. Không dạng nào đơn lẻ xác định được toàn bộ thuật toán mà mô hình dùng.
-
-@ig-all giữ toàn bộ attribution token có dấu của ba trường hợp, thay vì chỉ lấy giá trị cue. @patch-all giữ toàn bộ sweep theo tầng. Hai hình hỗ trợ kiểm tra vị trí token và dạng đường cong mà bản đồ số học thu nhỏ, gồm cả hiệu ứng yếu, âm hoặc gần không. Chúng vẫn đo các phép biến đổi khác nhau của cùng ưu thế A/B, nên không thể tự xác nhận văn bản tự giải thích trung thực.
-
-#page(flipped: true)[
-  #figure(
-    image("figures/arithmetic-case-comparison.svg", width: 100%),
-    caption: [Bằng chứng số học từ `v1.0.0/frozen.json`: hai lượt mô hình chọn A và cho $F$; lượt tự giải thích riêng phát biểu B. Đổi cue cho $Delta F_"input"$, IG cho attribution có dấu, patch cho hiệu ứng theo tầng. Cue có tác động trong các phép can thiệp này, nhưng kết quả không xác lập cơ chế đầy đủ hay giải thích trung thực cho lựa chọn A.],
-  ) <comparison>
-]
+@ig-all giữ toàn bộ attribution token có dấu của ba trường hợp dưới dạng lời nhắc dễ đọc: mỗi mảng màu vẫn ứng với đúng một token gốc; `↵` biểu thị xuống dòng, viền xanh đánh dấu cue, và token cấu trúc chat có IG bằng 0 nên không hiện. Thang màu phân kỳ chung đặt 0 ở giữa: đỏ âm làm giảm $F$ về $y^-$, xanh dương làm tăng $F$ về $y^+$. Cách đọc theo lời nhắc được gợi ý bởi trực quan hóa attribution trong Debug-XAI (Tan và cộng sự, 2026), nhưng dấu màu ở đây theo $F$ của dự án, không theo hàm đích contrastive của công trình đó. @patch-all giữ sweep theo tầng. Hai hình là chi tiết kiểm tra cả hiệu ứng yếu, âm hoặc gần không; chúng không thể tự xác nhận văn bản tự giải thích trung thực.
 
 #figure(
   image("figures/integrated-gradients-token-attribution.svg", width: 100%),
-  caption: [Chi tiết IG cho ưu thế A/B tại token trả lời đầu tiên trong ba trường hợp. Đầu vào là embedding clean, tham chiếu dấu cách và gradient của $F$; đầu ra là attribution có dấu theo token, với vạch xanh tại cue. Giá trị mô tả đường baseline → clean và phép tính được kiểm bằng completeness; chúng không chứng minh cơ chế nhân quả hay tính trung thực của lời tự giải thích. Nguồn: phân tích tất định từ `v1.0.0/frozen.json`.],
+  caption: [Chi tiết IG cho ưu thế A/B tại token trả lời đầu tiên trong ba trường hợp. Đầu vào là embedding clean, tham chiếu dấu cách và gradient của $F$; đầu ra là attribution có dấu theo từng token của lời nhắc, viền xanh tại cue. Đỏ làm giảm $F$ về $y^-$, xanh dương tăng $F$ về $y^+$, cùng thang màu lấy tâm 0. Giá trị mô tả đường baseline → clean và được kiểm bằng completeness; chúng không chứng minh cơ chế nhân quả hay tính trung thực của lời tự giải thích. Nguồn: phân tích tất định từ `v1.0.0/frozen.json`.],
 ) <ig-all>
 
 #figure(
-  image("figures/activation-patching-layer-effects.svg", width: 90%),
+  image("figures/activation-patching-layer-effects.svg", width: 78%),
   caption: [Chi tiết patch cho ưu thế A/B của lượt contrast trong ba trường hợp. Đầu vào là kích hoạt cue clean/contrast và $F$; đầu ra là hiệu ứng clean-to-contrast theo tầng khi thay vector residual stream tại cue. Đường cong hỗ trợ tác động nhân quả dưới đúng can thiệp này, không chứng minh biểu diễn là cần thiết hay một cơ chế đầy đủ. Nguồn: phân tích tất định từ `v1.0.0/frozen.json`.],
 ) <patch-all>
 
@@ -151,4 +158,5 @@ Các phát hiện đều ở mức ba trường hợp đã chọn trước, mộ
 - Sundararajan, M., Taly, A., & Yan, Q. (2017). #link("https://proceedings.mlr.press/v70/sundararajan17a.html")[_Axiomatic Attribution for Deep Networks._] ICML 34. Định nghĩa và tính đầy đủ của IG.
 - Turpin, M., Michael, J., Perez, E., & Bowman, S. R. (2023). #link("https://proceedings.neurips.cc/paper_files/paper/2023/hash/ed3fea9033a80fea1376299fa7863f4a-Abstract.html")[_Language Models Don't Always Say What They Think._] NeurIPS 36. Bằng chứng thực nghiệm về giới hạn của lời giải thích chain-of-thought; Schneider dẫn công trình này là năm 2024.
 - Heimersheim, S., & Nanda, N. (2024). #link("https://arxiv.org/abs/2404.15255")[_How to use and interpret activation patching._] Hướng can thiệp và giới hạn diễn giải patching.
+- Tan và cộng sự (2026). #link("https://github.com/microsoft/Debug-XAI")[_Debug-XAI / Contrastive Attribution in the Wild._] Chỉ tham khảo cách hiển thị attribution dễ đọc và lối phân tích drill-down; không dùng LRP hay kết quả của họ làm bằng chứng cho IG ở đây.
 - Nguồn kết quả: #link("https://github.com/itskyf/MTH110-2026-XAI-Demos/releases/tag/v1.0.0")[`v1.0.0/frozen.json`], giao thức `docs/research/protocol.md`, và mã phân tích `src/mth110/analysis.py`. Chạy `bash scripts/fetch_frozen.sh` rồi `pixi run --locked python -m mth110.analysis` để kiểm tra số và sinh lại hình. Handoff về baseline được ghi tại #link("https://github.com/itskyf/MTH110-2026-XAI-Demos/issues/1#issuecomment-5819709379")[Issue #1].
