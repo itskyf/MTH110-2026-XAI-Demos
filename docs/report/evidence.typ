@@ -25,8 +25,8 @@ Cue IG is the signed attribution at the pre-specified cue token. The IG residual
 )
 
 #figure(
-  image("figures/patch.svg", width: 100%),
-  caption: [Layer-wise effect of replacing the contrast cue activation with its clean value.],
+  image("figures/activation-patching-layer-effects.svg", width: 100%),
+  caption: [Layer-wise activation patching effects from replacing the contrast cue activation with its clean value.],
 )
 
 == Recorded self-explanations

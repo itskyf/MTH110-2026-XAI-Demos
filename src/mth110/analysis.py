@@ -87,7 +87,7 @@ def render(data: dict) -> None:
     figures = REPORT / "figures"
     figures.mkdir(exist_ok=True)
     attribution = figures / "integrated-gradients-token-attribution.svg"
-    patch = figures / "patch.svg"
+    patch = figures / "activation-patching-layer-effects.svg"
     plt.rcParams["svg.hashsalt"] = "mth110-frozen"
     plt.rcParams["svg.fonttype"] = "none"
 
@@ -187,10 +187,10 @@ def render(data: dict) -> None:
         ")",
         "",
         "#figure(",
-        '  image("figures/patch.svg", width: 100%),',
+        '  image("figures/activation-patching-layer-effects.svg", width: 100%),',
         (
-            "  caption: [Layer-wise effect of replacing the contrast cue "
-            "activation with its clean value.],"
+            "  caption: [Layer-wise activation patching effects from replacing "
+            "the contrast cue activation with its clean value.],"
         ),
         ")",
         "",
