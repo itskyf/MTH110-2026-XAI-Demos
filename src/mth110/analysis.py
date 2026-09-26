@@ -11,6 +11,8 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.font_manager import FontProperties
+from matplotlib.patches import Rectangle
 from transformers import AutoTokenizer
 
 SOURCE = Path("data/frozen.json")
@@ -166,7 +168,7 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
         if case["contrast_score"] > 0
         else case["alternative_label"]
     )
-    for y, name, cue, choice, score in (
+    for y, name, cue, preference, score in (
         (
             0.62,
             "clean",
@@ -184,7 +186,9 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
     ):
         _diagram_box(model_axis, 0.13, y, f"x_{name}: {question}\nCue: {cue}")
         _diagram_box(model_axis, 0.34, y, "Qwen")
-        _diagram_box(model_axis, 0.55, y, f"logits A/B\nchọn {choice}")
+        _diagram_box(
+            model_axis, 0.55, y, f"vector logits\nz_A, z_B → nghiêng {preference}"
+        )
         _diagram_box(model_axis, 0.78, y, f"F({name}) = {score:.3f}", "#e8f2ec")
         for left, right in ((0.23, 0.29), (0.39, 0.46), (0.63, 0.70)):
             _diagram_arrow(model_axis, (left, y), (right, y))
@@ -199,7 +203,95 @@ def _draw_model_runs(model_axis: Axes, case: dict) -> None:
     )
 
 
-def render_arithmetic_comparison(data: dict) -> None:
+def _draw_signed_prompt(
+    axis: Axes,
+    case: dict,
+    tokenizer: AutoTokenizer,
+    *,
+    size: int,
+    scale: float,
+) -> None:
+    """Show each frozen user-token attribution behind readable prompt text."""
+    tokens = tokenizer.convert_ids_to_tokens(case["clean_token_ids"])
+    end = tokens.index("<|im_end|>")
+    check(
+        all(value == 0 for value in case["token_attribution"][:3])
+        and all(value == 0 for value in case["token_attribution"][end:]),
+        f"{case['case']}: omitted chat-structure attribution differs",
+    )
+    lines: list[list[tuple[str, float, int]]] = [[]]
+    for position in range(3, end):
+        value = case["token_attribution"][position]
+        parts = tokenizer.decode([case["clean_token_ids"][position]]).split("\n")
+        for index, part in enumerate(parts):
+            if part:
+                lines[-1].append((part, value, position))
+            if index < len(parts) - 1:
+                lines[-1].append(("↵", value, position))
+                lines.append([])
+    max_rows = 6
+    check(len(lines) <= max_rows, f"{case['case']}: prompt heatmap exceeds panel")
+    axis.set(xlim=(0, 1), ylim=(0, 8))
+    axis.axis("off")
+    axis.figure.canvas.draw()
+    font = FontProperties(family="DejaVu Sans Mono", size=size)
+    char_px = axis.figure.canvas.get_renderer().get_text_width_height_descent(
+        "M", font, ismath=False
+    )[0]
+    char_fraction = char_px / axis.bbox.width
+    check(
+        all(
+            sum(len(piece) for piece, _, _ in line) * char_fraction <= 1
+            for line in lines
+        ),
+        f"{case['case']}: prompt heatmap exceeds panel width",
+    )
+    colors = plt.get_cmap("RdBu")
+    for row, line in enumerate(lines):
+        y = 0.83 - 0.12 * row
+        cursor = 0
+        for piece, value, position in line:
+            color = colors((value / scale + 1) / 2)
+            face = tuple(0.53 + 0.47 * channel for channel in color[:3])
+            axis.add_patch(
+                Rectangle(
+                    (cursor * char_fraction, y - 0.047),
+                    len(piece) * char_fraction,
+                    0.094,
+                    transform=axis.transAxes,
+                    facecolor=face,
+                    edgecolor="#217a42" if position == case["cue_position"] else "none",
+                    linewidth=1.7 if position == case["cue_position"] else 0,
+                )
+            )
+            cursor += len(piece)
+        axis.text(
+            0,
+            y,
+            "".join(piece for piece, _, _ in line),
+            transform=axis.transAxes,
+            fontproperties=font,
+            va="center",
+        )
+
+
+def _draw_ig_scale(axis: Axes, scale: float, bounds: tuple[float, ...]) -> None:
+    """Show the same zero-centered colors used behind the prompt tokens."""
+    colors = plt.get_cmap("RdBu")
+    palette = [
+        tuple(0.53 + 0.47 * channel for channel in colors(index / 255)[:3])
+        for index in range(256)
+    ]
+    bar = axis.inset_axes(bounds)
+    bar.imshow([palette], aspect="auto", extent=(-scale, scale, 0, 1))
+    bar.set_yticks([])
+    bar.set_xticks((-scale, 0, scale), (f"-{scale:.3f}", "0", f"+{scale:.3f}"))
+    bar.tick_params(axis="x", labelsize=9, length=2, pad=1)
+    for spine in bar.spines.values():
+        spine.set_visible(False)
+
+
+def render_arithmetic_comparison(data: dict, tokenizer: AutoTokenizer) -> None:
     """Map the frozen arithmetic behavior to distinct evidence and limits."""
     case = next(case for case in data["cases"] if case["case"] == "arithmetic")
     plt.rcParams["font.family"] = "Liberation Sans"
@@ -212,7 +304,7 @@ def render_arithmetic_comparison(data: dict) -> None:
     title_axis.text(
         0.01,
         0.95,
-        "SỐ HỌC: LỰA CHỌN ĐO ĐƯỢC ≠ LỜI TỰ GIẢI THÍCH",
+        "SỐ HỌC: ƯU THẾ A/B TỪ LOGITS ≠ LỜI TỰ GIẢI THÍCH",
         fontsize=20,
         weight="bold",
         color="#a43432",
@@ -221,8 +313,9 @@ def render_arithmetic_comparison(data: dict) -> None:
     title_axis.text(
         0.01,
         0.05,
-        "Cue vẫn làm thay đổi hành vi đo bằng F; IG và patch soi sáng "
-        "hai phạm vi khác của cùng hành vi.",
+        f"Ca này: y+ = {case['correct_label']} (đúng), "
+        f"y- = {case['alternative_label']} (còn lại); "
+        rf"$F=z_{{y^+}}-z_{{y^-}}=z_{{{case['correct_label']}}}-z_{{{case['alternative_label']}}}$",
         fontsize=13,
         va="bottom",
     )
@@ -238,7 +331,7 @@ def render_arithmetic_comparison(data: dict) -> None:
     self_axis.text(
         0.02,
         0.95,
-        "TỰ GIẢI THÍCH  ·  Lượt hỏi riêng sau khi đo lựa chọn",
+        "TỰ GIẢI THÍCH  ·  Lượt hỏi riêng sau khi suy ra ưu thế A/B",
         weight="bold",
         va="top",
         fontsize=15,
@@ -248,7 +341,7 @@ def render_arithmetic_comparison(data: dict) -> None:
         0.17,
         0.52,
         f"Prompt riêng: câu hỏi + Cue: {case['correct_label']}\n"
-        f"+ nhãn đã chọn {case['selected_label']}",
+        f"+ nhãn {case['selected_label']} suy ra từ logits",
     )
     _diagram_box(self_axis, 0.40, 0.52, "Qwen")
     _diagram_arrow(self_axis, (0.32, 0.52), (0.35, 0.52))
@@ -260,59 +353,43 @@ def render_arithmetic_comparison(data: dict) -> None:
         0.51,
         0.08,
         f"BẤT ĐỒNG: phát biểu {case['correct_label']} ≠ "
-        f"lựa chọn đo được {case['selected_label']}.\n"
-        "Không thể coi đây là giải thích trung thực cho lựa chọn đã đo.",
+        f"ưu thế suy ra {case['selected_label']}.\n"
+        "Không thể coi đây là giải thích trung thực cho ưu thế A/B đã đo.",
         color="#b33d39",
         weight="bold",
         fontsize=13,
     )
 
-    values = case["token_attribution"]
-    positions = range(len(values))
     ig_axis = fig.add_subplot(grid[3, 0])
-    ig_axis.bar(
-        positions,
-        values,
-        color=[
-            "#277b45"
-            if position == case["cue_position"]
-            else "#c0504d"
-            if value < 0
-            else "#3978a8"
-            for position, value in enumerate(values)
-        ],
-    )
-    ig_axis.axhline(0, color="black", linewidth=0.5)
-    ig_axis.annotate(
-        f"Cue: {case['correct_label']} = {values[case['cue_position']]:+.3f}",
-        xy=(case["cue_position"], values[case["cue_position"]]),
-        xytext=(case["cue_position"] + 3, max(values) * 0.85),
-        arrowprops={"arrowstyle": "->", "color": "#277b45"},
-        color="#277b45",
-        weight="bold",
-    )
-    ig_axis.set(
-        xlabel="Vị trí token (chi tiết tên token ở hình IG toàn bộ)",
-        ylabel="IG có dấu",
-    )
-    ig_axis.set_title(
-        "IG  ·  Embedding clean + baseline + F → attribution token",
-        loc="left",
-        fontsize=14,
-        weight="bold",
-    )
-
     patch_axis = fig.add_subplot(grid[3, 1])
+    note_axes = [fig.add_subplot(grid[4, column]) for column in range(2)]
     patch_axis.plot(range(len(case["patch_deltas"])), case["patch_deltas"], marker=".")
     patch_axis.axhline(0, color="black", linewidth=0.5)
+    reference = case["clean_score"] - case["contrast_score"]
+    patch_axis.axhline(
+        reference, color="#65727b", linestyle="--", linewidth=1.2, zorder=0
+    )
+    patch_axis.set_ylim(top=max(reference, *case["patch_deltas"]) + 1.0)
+    patch_axis.text(
+        0.98,
+        reference + 0.08,
+        "F(clean) - F(contrast) = -ΔF_input\n"
+        f"{reference:+.3f} · tham chiếu, không là ngưỡng",
+        transform=patch_axis.get_yaxis_transform(),
+        ha="right",
+        va="bottom",
+        color="#4e5961",
+        fontsize=11,
+    )
     patch_axis.set(xlabel="Tầng decoder", ylabel="ΔF_patch")
     patch_axis.set_title(
-        "PATCH  ·  Kích hoạt cue clean/contrast + F → ΔF theo tầng",
+        "PATCH  ·  Prompt đôi + kích hoạt cue + F → ΔF theo tầng",
         loc="left",
         fontsize=14,
         weight="bold",
     )
-    for column, message in enumerate(
+    for note_axis, message in zip(
+        note_axes,
         (
             (
                 "Cue có attribution dương trên đường baseline → clean;\n"
@@ -322,11 +399,32 @@ def render_arithmetic_comparison(data: dict) -> None:
                 "Phục hồi biểu diễn cue làm F đổi ở tầng đầu;\n"
                 "không chứng minh tính cần thiết hay cơ chế đầy đủ."
             ),
-        )
+        ),
+        strict=True,
     ):
-        note_axis = fig.add_subplot(grid[4, column])
         note_axis.axis("off")
         note_axis.text(0, 0.8, message, va="top", fontsize=12, color="#34495e")
+    scale = max(
+        abs(value) for item in data["cases"] for value in item["token_attribution"]
+    )
+    _draw_signed_prompt(ig_axis, case, tokenizer, size=14, scale=scale)
+    _draw_ig_scale(ig_axis, scale, (0.10, 0.15, 0.76, 0.06))
+    ig_axis.text(
+        0,
+        7.7,
+        "IG · embedding clean + baseline + F → token IG",
+        weight="bold",
+        fontsize=13,
+    )
+    cue_value = case["token_attribution"][case["cue_position"]]
+    ig_axis.text(
+        0,
+        0.25,
+        f"Viền xanh: cue {case['correct_label']} = {cue_value:+.3f} · "
+        "đỏ giảm F → y-; xanh tăng F → y+",
+        fontsize=12,
+    )
+
     fig.savefig(FIGURES / "arithmetic-case-comparison.svg", metadata={"Date": None})
     plt.close(fig)
 
@@ -342,32 +440,34 @@ def render(data: dict) -> None:
     )
 
     fig, axes = plt.subplots(
-        len(data["cases"]), 1, figsize=(16, 12), layout="constrained"
+        len(data["cases"]), 1, figsize=(10, 8.2), layout="constrained"
+    )
+    scale = max(
+        abs(value) for case in data["cases"] for value in case["token_attribution"]
     )
     for axis, case in zip(axes, data["cases"], strict=True):
-        values = case["token_attribution"]
-        positions = range(len(values))
-        axis.bar(
-            positions,
-            values,
-            color=["#c0504d" if value < 0 else "#3978a8" for value in values],
+        _draw_signed_prompt(axis, case, tokenizer, size=14, scale=scale)
+        cue_value = case["token_attribution"][case["cue_position"]]
+        axis.text(
+            0,
+            7.65,
+            f"{case['case'].capitalize()} · "
+            f"cue {case['correct_label']} = {cue_value:+.3f}",
+            fontsize=15,
+            weight="bold",
         )
-        axis.axhline(0, color="black", linewidth=0.5)
-        axis.axvline(
-            case["cue_position"],
-            color="#277b45",
-            linewidth=1.4,
-            label="frozen cue position",
+        axis.text(
+            0,
+            0.25,
+            "Viền xanh: cue đóng băng · ↵: xuống dòng · token cấu trúc chat có IG = 0",
+            fontsize=11,
         )
-        axis.set_title(case["case"].capitalize())
-        axis.set_ylabel("Signed IG")
-        axis.set_xticks(
-            list(positions),
-            tokenizer.convert_ids_to_tokens(case["clean_token_ids"]),
-            rotation=90,
-            fontsize=10,
-        )
-        axis.legend(loc="upper right")
+    fig.suptitle(
+        "IG có dấu theo token · cùng thang màu ±"
+        f"{scale:.3f}: đỏ giảm F về y-; xanh tăng F về y+",
+        fontsize=14,
+    )
+    _draw_ig_scale(axes[0], scale, (0.54, 0.64, 0.42, 0.08))
     fig.savefig(
         FIGURES / "integrated-gradients-token-attribution.svg",
         metadata={"Date": None},
@@ -391,7 +491,7 @@ def render(data: dict) -> None:
     )
     plt.close(fig)
 
-    render_arithmetic_comparison(data)
+    render_arithmetic_comparison(data, tokenizer)
     for path in FIGURES.glob("*.svg"):
         path.write_text(
             "\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n"
