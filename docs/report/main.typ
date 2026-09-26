@@ -158,7 +158,7 @@ Các phát hiện đều ở mức ba trường hợp đã chọn trước, mộ
 
 = Nguồn và khả năng tái lập
 
-- Schneider, J. (2024). _Explainable Generative AI (GenXAI): A Survey, Conceptualization, and Research Agenda._ Bản nguồn LaTeX cục bộ `references/sn-article.tex`, arXiv:2404.09554. Khung khái niệm, taxonomy và desiderata.
+- Schneider, J. (2024). _Explainable Generative AI (GenXAI): A Survey, Conceptualization, and Research Agenda._ arXiv:2404.09554. Khung khái niệm, taxonomy và desiderata.
 - Sundararajan, M., Taly, A., & Yan, Q. (2017). #link("https://proceedings.mlr.press/v70/sundararajan17a.html")[_Axiomatic Attribution for Deep Networks._] ICML 34. Định nghĩa và tính đầy đủ của IG.
 - Turpin, M., Michael, J., Perez, E., & Bowman, S. R. (2023). #link("https://proceedings.neurips.cc/paper_files/paper/2023/hash/ed3fea9033a80fea1376299fa7863f4a-Abstract.html")[_Language Models Don't Always Say What They Think._] NeurIPS 36. Bằng chứng thực nghiệm về giới hạn của lời giải thích chain-of-thought; Schneider dẫn công trình này là năm 2024.
 - Heimersheim, S., & Nanda, N. (2024). #link("https://arxiv.org/abs/2404.15255")[_How to use and interpret activation patching._] Hướng can thiệp và giới hạn diễn giải patching.
